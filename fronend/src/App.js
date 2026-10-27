@@ -1,7 +1,7 @@
+
 import React from "react";
 import { AuthProvider } from "./context/AuthContext";
 import {
-  BrowserRouter,
   Navigate,
   Route,
   Routes,
@@ -10,6 +10,8 @@ import {
 import Login from "./Pages/Login";
 import Register from "./Pages/Register";
 import ProtectedRoute from "./components/ProtectedRoute";
+
+
 import Dashboard from "./Pages/Dashboard";
 import Leads from "./Pages/Leads";
 import Team from "./Pages/Team";
@@ -22,15 +24,17 @@ import LeadActivity from "./Pages/LeadActivity";
 function App() {
   return (
     <AuthProvider>
-         {/* <BrowserRouter> */}
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+      <Routes>
+        {/* Public pages */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-          <Route element={<ProtectedRoute />}>
+        {/* All authenticated pages share one layout */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Dashboard />}>
             <Route
               path="/dashboard"
-              element={<Dashboard />}
+              // element={<Dashboard />}
             />
 
             <Route path="/leads" element={<Leads />} />
@@ -45,6 +49,7 @@ function App() {
               element={<LeadActivity />}
             />
 
+            {/* Administrator-only pages */}
             <Route
               element={
                 <ProtectedRoute
@@ -53,16 +58,19 @@ function App() {
               }
             >
               <Route path="/team" element={<Team />} />
+
               <Route
                 path="/team/create"
                 element={<CreateUser />}
               />
+
               <Route
                 path="/audit-logs"
                 element={<AuditLogs />}
               />
             </Route>
 
+            {/* Administrator and manager */}
             <Route
               element={
                 <ProtectedRoute
@@ -76,20 +84,19 @@ function App() {
               />
             </Route>
           </Route>
+        </Route>
 
-          <Route
-            path="/"
-            element={<Navigate to="/dashboard" replace />}
-          />
+        <Route
+          path="/"
+          element={<Navigate to="/dashboard" replace />}
+        />
 
-          <Route
-            path="*"
-            element={<Navigate to="/dashboard" replace />}
-          />
-        </Routes>
-        {/* </BrowserRouter> */}
-      </AuthProvider>
-    
+        <Route
+          path="*"
+          element={<Navigate to="/dashboard" replace />}
+        />
+      </Routes>
+    </AuthProvider>
   );
 }
 

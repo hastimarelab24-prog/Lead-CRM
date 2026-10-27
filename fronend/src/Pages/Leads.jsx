@@ -8,7 +8,6 @@ import Pagination from "../components/common/pagination";
 export default function Leads() {
   const [leads, setLeads] = useState([]);
   const [pagination, setPagination] = useState({
-    currentPage: 1,
     totalPages: 1,
   });
   const [filters, setFilters] = useState({
@@ -84,7 +83,7 @@ export default function Leads() {
 
     try {
       await leadService.deleteLead(id);
-      await loadLeads(); 
+      await loadLeads();
     } catch (error) {
       console.error("Delete error:", error);
       alert(
@@ -95,22 +94,50 @@ export default function Leads() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 border rounded-xl shadow-sm">
-        <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
-            Lead Registry Control
-          </h1>
-          <p className="text-sm text-gray-500">
-            Monitor pipeline conversions, channels, and personnel assignments.
-          </p>
-        </div>
-        <button
-          onClick={() => setModal({ isOpen: true, data: null })}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm shadow-blue-500/10 transition"
-        >
-          + Onboard Lead
-        </button>
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 selection:bg-indigo-600">
+      <div className="max-w-9xl mx-auto space-y-8">
+        {/* header  */}
+        <header className=" relative overflow-hidden  bg-white p-6 sm:p-8 shadow-sm  transition-all duration-300 hover:shadow-md">
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+                Lead Registry Control
+              </h1>
+              <p className="text-sm text-gray-500 max-w-xl">
+                Monitor pipeline conversions, channels, and personnel
+                assignments.
+              </p>
+            </div>
+            <button
+              onClick={() => setModal({ isOpen: true, data: null })}
+              className="group relative inline-flex items-center justify-center gap-2 px-6  py-3.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/20  hover:shadow-xl hover:shadow-indigo-600/35 transition-all duration-300   hover:-translate-y-1 active:translate-y-0 active:scale-95 cursor-pointer"
+            >
+              <svg
+                className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90 
+                group-hover:scale-110"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              <span className="tracking-wide">Onboard New Lead</span>
+            </button>
+          </div>
+
+          {/* metric card */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-8 pt-6 border-t border-slate-100">
+            <div className="group p-4 rounded-xl bg-slate-300 shadow-none hover:shadow-md transition-all duration-300 hover:-translate-y-1 cursor-default">
+              <p className="text-xs text-slate-500 font-medium  group-hover:text-slate-700 transition-colors"> Total Registered</p>
+              <p>{pagination ?.totalItems || leads.length}</p>
+            </div>
+          </div>
+        </header>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
