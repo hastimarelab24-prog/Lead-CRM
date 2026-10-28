@@ -222,4 +222,35 @@ router.patch("/:id/role", allowRole("administrator"), async (req, res) => {
   }
 });
 
+
+
+
+// delete
+router.delete("/:id",allowRole("administrator"),async(req,res)=>{
+  try{
+    const {id}=req.params;
+    if(!mongoose.isValidObjectId(id)){
+      return res.status(400).json({message: "invalid user id.",});
+    }
+    if(req.user.id=== id){
+      return res.status(400).json({message:"you cannot delete your own account",});
+    }
+    const user = await User.findById(id);
+    if(!user){
+      return res.status(404).json({message:"user not found",})
+    }
+    await User.findByIdAndDelete(id);
+    try{
+      await logAction(req.user.id,"USER_DELETED","User",id,{
+        name:user.name,email:user.email,role:user.role,
+      })
+    }catch(auditError){
+      console.error("audit logger error",auditError);
+    }
+    return res.status(200).json({success:true,message:"team member deleted successfully"})
+  }catch(err){
+console.error("delete user error",err);
+return res.status(500).json({message:"failed to delete team member."})
+  }
+})
 module.exports = router;
