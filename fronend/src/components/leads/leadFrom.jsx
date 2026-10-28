@@ -1,78 +1,7 @@
-// import React, { useEffect, useState } from 'react'
-
-// const SOURCES =[
-//         "Website","referral","Cold Outreach","inbound Call", "social media",
-//     ]
-// export default function leadFrom() {
-//     const [fromData,setFormData]=useState({name:"",comapany:'',email:"",phone:"",source:"",assignedEmployee:"",})
-//     const [ error,setErrors]=useState({});
-//     useEffect(()=>{
-//         if(initalData) setFormData(initalData);
-//     },[initalData])
-//     const handleChange =(e)=>{
-//         setFormData({...fromData,[e.target.name]:e.target.value});
-//         if(error[e.target.name]) setErrors({...error,[e.target.name]:""})
-//     }
-
-//     const handleSubmit = async(e)=>{
-//         e.preventDefault();
-//         try{
-//             await onSubmit(fromData);
-//         }catch(err){
-//             if(err.errors){
-//                 const mapped={};
-//                 err.errors.forEach((err)=>(mapped[err.field]=err.message))
-//                 setErrors[mapped]
-//             }else{
-//                 alert(err.message || "failed excution request")
-//             }
-//         }
-//     }
-//   return (
-//     <div>
-//         <form action="" onSubmit={handleSubmit}>
-//             <div>
-
-//                 <label htmlFor="">Full name*</label>
-//                 <input type="name" onChange={handleChange} value={fromData.name} />
-//                 {error.name && (<p>{error.name}</p>)}
-//             </div>
-//             <div>
-//                 <label htmlFor="">Company*</label>
-//                 <input type="comapny" value={fromData.comapany} onChange={handleChange} />
-//             </div> <div>
-//                 <label htmlFor="">Email*</label>
-//                 <input type="email" value={fromData.email} onChange={handleChange} />
-//             </div>
-//              <div>
-//                 <label htmlFor="">phone*</label>
-//                 <input type="phonr" value={fromData.phone} onChange={handleChange} />
-//              {error.phone && (<p>{error.phone}</p>)}
-//             </div>
-//             <div>
-//                 <label htmlFor=""> Source</label>
-//                 <select name="source"  value={fromData.source} onChange={handleChange} id="">
-//                     <option value=""> select source</option>
-//                     {SOURCES.map((s)=>(<option key={s} value={s}>{s}</option>))}
-//                 </select>
-//                    {error.source && (<p>{error.source}</p>)}
-//             </div>
-//             <div>
-//                 <label htmlFor=""> Assigned Employee</label>
-//                 <input type="assignedEmployee" value={fromData.assignedEmployee} onChange={handleChange} />
-//                     {error.assignedEmployee && (<p>{error.assignedEmployee}</p>)}
-//             </div>
-//             <div>
-//                 <button onClick={onclose}>cancel</button>
-//                 <button>save Lead</button>
-//             </div>
-//         </form>
-//     </div>
-//   )
-// }
 
 import React, { useEffect, useState } from "react";
 import { apiRequest } from "../../api/api";
+import { data } from "react-router-dom";
 
 const SOURCES = [
   "website",
@@ -92,17 +21,7 @@ const STATUSES = [
   "won",
 ];
 
-const INITIAL_FORM = {
-  name: "",
-  company: "",
-  email: "",
-  phone: "",
-  source: "",
-  status: "new",
-  assignedEmployee: "",
-  followUpDate: "",
-  priority: "Medium",
-  followUpNote: "",
+const INITIAL_FORM = { name: "", company: "", email: "", phone: "", source: "", status: "new", assignedEmployee: "", followUpDate: "", followUpTime:"", followUpType:"", priority: "Medium", followUpNote: "",
 };
 
 export default function LeadForm({
@@ -172,12 +91,17 @@ export default function LeadForm({
           ? initialData.assignedEmployee?._id || ""
           : initialData.assignedEmployee || "";
 
-      let formattedDate = "";
-      if (initialData.followUpDate) {
-        formattedDate = initialData.followUpDate.includes("T")
-          ? initialData.followUpDate.split("T")[0]
-          : initialData.followUpDate.substring(0, 10);
+      let formattedDate = ""; let formattedTime= "";
+      const dataeObje=new Date(initialData.followUpDate);
+      if(!isNaN(dataeObje)){
+        formattedDate = dataeObje.toISOString().split("T")[0];
+        formattedTime= dataeObje.toTimeString().substring(0,5)
       }
+      // if (initialData.followUpDate) {
+      //   formattedDate = initialData.followUpDate.includes("T")
+      //     ? initialData.followUpDate.split("T")[0]
+      //     : initialData.followUpDate.substring(0, 10);
+      // }
 
       setFormData({
         name: initialData.name || "",
@@ -188,6 +112,8 @@ export default function LeadForm({
         status: initialData.status || "new",
         assignedEmployee,
         followUpDate: formattedDate,
+        followUpTime:formattedTime || initialData.followUpTime || "",
+        activityTYpe:initialData.activityTYpe || "Call",
         priority: initialData.priority || "Medium",
         followUpNote: initialData.followUpNote || "",
       });
@@ -260,6 +186,11 @@ export default function LeadForm({
       return;
     }
 
+    let cominedDateTime = null;
+    if(formData.followUpDate){
+      const timeString = formData.followUpTime ? formData.followUpTime :"00:00";
+      cominedDateTime=new Date(`${formData.followUpDate }T${timeString}:00`).toISOString()
+    }
     const payload = {
       name: formData.name.trim(),
       company: formData.company.trim(),
@@ -268,7 +199,8 @@ export default function LeadForm({
       source: formData.source,
       status: formData.status,
       assignedEmployee: formData.assignedEmployee,
-      followUpDate: formData.followUpDate || null,
+      followUpDate: cominedDateTime,
+      activityTYpe:formData.activityTYpe,
       priority: formData.priority,
       followUpNote: formData.followUpNote.trim(),
     };
@@ -494,6 +426,11 @@ export default function LeadForm({
           </div>
 
           <div>
+            <label htmlFor="" className={labelClass}> Time</label>
+            <input type="time" name="FollowupTime" value={formData.followUpTime} onChange={handleChange} className={inputClass} />
+          </div>
+
+          <div>
             <label className={labelClass}>Priority</label>
             <select 
               name="priority" 
@@ -511,7 +448,7 @@ export default function LeadForm({
         <div className="mt-3">
           <label className={labelClass}>Follow-up Note</label>
           <textarea 
-            name="followUpNote" // 👈 અહીં followUpNote કરી દીધું (નાના u ને બદલે મોટો U)
+            name="followUpNote" 
             value={formData.followUpNote} 
             onChange={handleChange} 
             placeholder="enter follow-ups remarks.."
