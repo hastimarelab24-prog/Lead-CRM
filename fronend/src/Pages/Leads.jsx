@@ -9,12 +9,14 @@ import { WorkspaceContext } from "../context/WorkCountContext";
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
-
+const [currentPage, setCurrentPage] = useState(1);
 const { setTotalLeads } = useContext(WorkspaceContext);
   const [pagination, setPagination] = useState({
     totalPages: 1,
     totalItems: 0,
+    currentPage:1,
   });
+  const itemsPerPage=10
   const [filters, setFilters] = useState({
     search: "",
     status: "",
@@ -49,14 +51,16 @@ const { setTotalLeads } = useContext(WorkspaceContext);
       }
 
       setLeads(leadsData);
+
      const pageDate=
         response?.pagination || {
-          currentPage: 1,
-          totalPages: 1,
+          currentPage: filters.page || 1,
+          totalPages: Math.max(1,Math.ceil(leadsData.length / itemsPerPage)),
           totalItems: leadsData.length,
         }
 
         setPagination(pageDate);
+        setCurrentPage(pageDate.currentPage || filters.page || 1);
         setTotalLeads(pageDate.totalItems ?? leadsData.length);
       
     } catch (err) {
@@ -279,7 +283,7 @@ const { setTotalLeads } = useContext(WorkspaceContext);
 
           <div className="p-1 ">
             <LeadTable
-              leads={leads}
+              leads={leads.slice((currentPage-1)*itemsPerPage,currentPage*itemsPerPage)}
               onEdit={(lead) => setModal({ isOpen: true, data: lead })}
               onDelete={handleDelete}
               onStatusChange={handleStatusChange}

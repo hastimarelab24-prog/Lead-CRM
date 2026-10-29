@@ -20,7 +20,7 @@ export default function LeadModal({ isOpen, onClose, title, children }) {
   if (!isOpen) return null;
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-start justify-center
+      className="fixed inset-0 z-[100] flex items-start justify-center
    overflow-y-auto bg-slate-950/60 p-2 sm:p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {

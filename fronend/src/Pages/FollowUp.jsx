@@ -2,12 +2,13 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheck, faHourglassHalf, faExclamationTriangle } from "@fortawesome/free-solid-svg-icons";
+import { IoRemoveCircle } from "react-icons/io5";
 
 export default function FollowUp() {
   const [pending, setPending] = useState([]);
   const [completed, setCompleted] = useState([]);
   const [overdue, setOverdue] = useState([]);
-  const [activeTab, setActiveTab] = useState("all"); // Default to "all" tab
+  const [activeTab, setActiveTab] = useState("all"); 
 
   useEffect(() => {
     fetchFollowUps();
@@ -44,6 +45,40 @@ export default function FollowUp() {
     }
   };
 
+const deleteFollowUp = async (id) => {
+  if (
+    !window.confirm(
+      "Are you sure you want to remove this follow-up?"
+    )
+  ) {
+    return;
+  }
+
+  try {
+    const response = await axios.delete(
+      `http://localhost:5000/api/leads/follow-ups/${id}`,
+      {
+        headers: getAuthHeader(),
+      }
+    );
+
+    console.log(response.data.message);
+
+    await fetchFollowUps();
+  } catch (err) {
+    console.error(
+      "Delete error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+
+    alert(
+      err.response?.data?.message ||
+        "Failed to remove follow-up."
+    );
+  }
+};
+
   // Combine all follow-ups for the "All" tab
   const allFollowUps = [...pending, ...completed];
 
@@ -72,7 +107,7 @@ export default function FollowUp() {
     <div className="p-6">
       <h2 className="text-2xl font-bold mb-4">Follow-ups Management</h2>
 
-      {/* 🔔 Notifications / Overdue Alert Box */}
+      {/* Notifications / Overdue Alert Box */}
       {overdue.length > 0 && (
         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded shadow">
           <p className="font-bold flex items-center gap-2">
@@ -133,7 +168,7 @@ export default function FollowUp() {
             {getDisplayedData().map((item) => {
               const completedStatus = isCompletedItem(item);
               return (
-                <tr key={item._id}>
+                <tr key={item._id} className="group hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap font-medium">{item.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{item.phone}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -151,20 +186,29 @@ export default function FollowUp() {
                     </span>
                   </td>
                   <td className="px-6 py-4">{item.followUpNote || "No notes"}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap flex items-center gap-2">
                     {completedStatus ? (
                       <span className="text-green-600 font-semibold text-sm flex items-center gap-1">
-                        <FontAwesomeIcon icon={faCheck} /> Completed
+                        <FontAwesomeIcon icon={faCheck} />
                       </span>
                     ) : (
                       <button
                         onClick={() => markAsCompleted(item._id)}
-                        className="text-amber-600 hover:text-amber-800 px-3 py-1 rounded text-lg transition-colors"
+                        className="text-amber-600 hover:text-amber-800 px-2 py-1 rounded text-lg transition-colors"
                         title="Mark as Completed"
                       >
                         <FontAwesomeIcon icon={faHourglassHalf} />
                       </button>
                     )}
+                    
+                    {/* Delete button appears only on row hover */}
+                    <button
+                      onClick={() => deleteFollowUp(item._id)}
+                      className="text-red-500 hover:text-red-700 p-1 text-xl transition-opacity duration-200 opacity-0 group-hover:opacity-100"
+                      title="Delete Follow-up"
+                    >
+                      <IoRemoveCircle />
+                    </button>
                   </td>
                 </tr>
               );
