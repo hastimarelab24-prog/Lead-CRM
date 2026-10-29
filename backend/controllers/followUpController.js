@@ -245,7 +245,7 @@ exports.getFollowUps = async (req, res) => {
     //     isActive: { $ne: false },
     //   }).select("_id");
 
-    //   filter.assignedTo = { $in: team.map((u) => u._id) };
+    //   filter.  assignedTo = { $in: team.map((u) => u._id) };
     // }
 
     if (req.query.status && req.query.status.trim() !== "") {

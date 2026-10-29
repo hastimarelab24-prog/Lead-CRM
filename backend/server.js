@@ -27,7 +27,10 @@ const loadRouter = (name, path) => {
 
 // Register each route only once
 app.use("/api/auth", require( "./routes/authRoutes"));
-
+app.use(
+  "/api/follow-ups",
+  loadRouter("Follow-up routes", "./routes/followUpRoutes")
+);
 app.use(
   "/api/dashboard",
   loadRouter("Dashboard routes", "./routes/dashboardRoutes")

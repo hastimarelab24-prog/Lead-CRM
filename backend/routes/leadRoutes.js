@@ -4,7 +4,10 @@ const mongoose = require("mongoose");
 const router = express.Router();
 
 const Lead = require("../models/lead");
+const FollowUp = require("../models/FollowUp");
 const User = require("../models/TeamUser");
+const verifyToken = require("../middleware/authMiddleware");
+
 
 const authMiddleware = require("../middleware/authMiddleware");
 const allowRoles = require("../middleware/roleMiddleware");
@@ -27,9 +30,56 @@ router.use(authMiddleware);
 
 // View and create leads
 router.route("/").get(getLeads).post(createLead);
-// folow-up spefific router 
-router.get("/follow-ups/all",getFollowUps);
+// folow-up spefific router // Follow-up specific routes inside leadRoutes.js
+router.get("/follow-ups/all", getFollowUps);
 router.put("/follow-ups/:id", updateFollowUpStatus);
+
+//  Aa route ahiya add karo (Lead routes ni andar j):
+
+router.delete("/follow-ups/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid lead ID.",
+      });
+    }
+
+    const lead = await Lead.findById(id);
+
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: "Lead not found.",
+      });
+    }
+
+    // Clear only follow-up fields. Keep the Lead document.
+    lead.followUpDate = null;
+    lead.followUpTime = "";
+    lead.followUpNote = "";
+    lead.followUpStatus = "Pending";
+    lead.priority = "Medium";
+
+    await lead.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Follow-up removed successfully.",
+      lead,
+    });
+  } catch (error) {
+    console.error("Delete follow-up error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to remove follow-up.",
+    });
+  }
+});
+
 // Update and delete a lead
 router.route("/:id").put(updatedLead).delete(deleteLead);
 
