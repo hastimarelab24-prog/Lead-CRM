@@ -10,7 +10,7 @@ import {
 import Login from "./Pages/Login";
 import Register from "./Pages/Register";
 import ProtectedRoute from "./components/ProtectedRoute";
-
+import WorkCountContext from "./context/WorkCountContext"
 
 import Dashboard from "./Pages/Dashboard";
 import Leads from "./Pages/Leads";
@@ -24,6 +24,9 @@ import LeadActivity from "./Pages/LeadActivity";
 function App() {
   return (
     <AuthProvider>
+      <WorkCountContext>
+
+
       <Routes>
         {/* Public pages */}
         <Route path="/login" element={<Login />} />
@@ -41,7 +44,7 @@ function App() {
 
             <Route
               path="/follow-up"
-              element={<FollowUps />}
+              element={<FollowUps/>}
             />
 
             <Route
@@ -96,6 +99,7 @@ function App() {
           element={<Navigate to="/dashboard" replace />}
         />
       </Routes>
+            </WorkCountContext>
     </AuthProvider>
   );
 }

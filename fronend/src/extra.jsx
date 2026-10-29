@@ -1,34 +1,56 @@
-const handleRemoveUser = async (userId, userName) => {
-  if (!userId) {
-    alert("User ID not found.");
-    return;
+
+router.get(
+  "/",
+  allowRole("administrator", "manager", "employee"),
+  async (req, res) => {
+    try {
+      // Get all team members
+      const users = await User.find()
+        .select("-password")
+        .sort({ createdAt: -1 })
+        .lean();
+
+      // Count leads assigned to each team member
+      const leadCounts = await Lead.aggregate([
+        {
+          $match: {
+            assignedEmployee: { $ne: null },
+          },
+        },
+        {
+          $group: {
+            _id: "$assignedEmployee",
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      // Convert counts into a lookup object
+      const countMap = new Map(
+        leadCounts.map((item) => [
+          String(item._id),
+          item.count,
+        ])
+      );
+
+      // Add assignedLeadsCount to each user
+      const usersWithLeadCounts = users.map((user) => ({
+        ...user,
+        assignedLeadsCount: countMap.get(String(user._id)) || 0,
+      }));
+
+      return res.status(200).json({
+        success: true,
+        users: usersWithLeadCounts,
+        employees: usersWithLeadCounts,
+      });
+    } catch (error) {
+      console.error("Load users with lead counts error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to load users and assigned lead counts.",
+      });
+    }
   }
-
-  if (
-    !window.confirm(
-      `Are you sure you want to remove ${userName} from the team?`
-    )
-  ) {
-    return;
-  }
-
-  try {
-    const result = await apiRequest(`/users/${userId}`, "DELETE");
-
-    setUsers((prev) =>
-      prev.filter((user) => String(user._id || user.id) !== String(userId))
-    );
-
-    alert(result.message || "Team member deleted successfully.");
-  } catch (err) {
-    console.error(
-      "Failed to remove user:",
-      err.response?.data || err
-    );
-
-    alert(
-      err.response?.data?.message ||
-        "Failed to delete team member."
-    );
-  }
-};
+);

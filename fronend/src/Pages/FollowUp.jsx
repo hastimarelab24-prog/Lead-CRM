@@ -483,7 +483,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
-export default function FollowUps() {
+export default function FollowUp() {
   const [pending, setPending] = useState([]);
   const [completed, setCompleted] = useState([]);
   const [overdue, setOverdue] = useState([]);

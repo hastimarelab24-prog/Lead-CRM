@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useContext } from "react";
 import { leadService } from "../services/leadService";
 import LeadTable from "../components/leads/LeadTable";
 import LeadModal from "../components/leads/LeadModal";
 import LeadForm from "../components/leads/leadFrom"; // Matches the misspelled file on disk
 import Pagination from "../components/common/pagination";
 import { data } from "react-router-dom";
+import { WorkspaceContext } from "../context/WorkCountContext";
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
+
+const { setTotalLeads } = useContext(WorkspaceContext);
   const [pagination, setPagination] = useState({
     totalPages: 1,
     totalItems: 0,
@@ -46,23 +49,26 @@ export default function Leads() {
       }
 
       setLeads(leadsData);
-      setPagination(
+     const pageDate=
         response?.pagination || {
           currentPage: 1,
           totalPages: 1,
           totalItems: leadsData.length,
-        },
-      );
+        }
+
+        setPagination(pageDate);
+        setTotalLeads(pageDate.totalItems ?? leadsData.length);
+      
     } catch (err) {
       console.error("Load leads failed:", err.response?.data || err.message);
     } finally {
       setIsLoading(false);
     }
-  }, [filters]);
+  }, [filters,setTotalLeads]);
 
   useEffect(() => {
     loadLeads();
-  }, [filters]);
+  }, [loadLeads]);
 
   const handleFormSubmit = async (formData) => {
     try {

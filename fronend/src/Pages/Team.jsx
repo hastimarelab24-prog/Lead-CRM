@@ -1,10 +1,12 @@
-  import React, { useCallback, useEffect, useState } from "react";
+  import React, { useCallback, useContext, useEffect, useState } from "react";
   import { apiRequest } from "../api/api";
   import { Link } from "react-router-dom";
   import CreateUser from "./CreateUser";
+import { WorkspaceContext } from "../context/WorkCountContext";
 
   export default function Team() {
     const [users, setUsers] = useState([]);
+    const{setTotalTeam}=useContext(WorkspaceContext);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
@@ -24,6 +26,7 @@
           : [];
 
         setUsers(userList);
+        setTotalTeam(userList.length)
       } catch (err) {
         console.error("Failed to load users:", err.response?.data || err);
         setError(
@@ -32,7 +35,7 @@
       } finally {
         setLoading(false);
       }
-    }, []);
+    }, [setTotalTeam]);
 
     useEffect(() => {
       loadUsers();
@@ -78,7 +81,7 @@
     // Calculate metrics
     const totalMembers = users.length;
     const managersCount = users.filter((u) => u.role?.toLowerCase() === "manager" || u.role?.toLowerCase() === "admin").length;
-    const totalLeadsAssigned = users.reduce((acc, u) => acc + (u.assignedLeadsCount || u.leadsCount || 0), 0);
+    const totalLeadsAssigned = users.reduce((total,user) => total + (user.assignedLeadsCount ?? 0), 0);
 
     return (
       <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 selection:bg-indigo-600">
@@ -171,7 +174,7 @@
                 const userEmail = user.email || "-";
                 const userRole = user.role || "Employee";
                 const isActive = user.isActive !== false;
-                const leadsCount = user.assignedLeadsCount || user.leadsCount || 0;
+                const leadsCount = user.assignedLeadsCount ?? 0;
 
                 return (
                   <div

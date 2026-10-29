@@ -47,7 +47,7 @@
 //       if (endDate) queryParams.append('endDate', endDate);
 
 //       const response = await fetch(`${API_BASE_URL}/api/dashboard?${queryParams.toString()}`);
-      
+
 //       const contentType = response.headers.get('content-type');
 //       if (!contentType || !contentType.includes('application/json')) {
 //         throw new Error('Server returned non-JSON response. Verify backend is running.');
@@ -294,11 +294,6 @@
 //   );
 // }
 
-
-
-
-
-
 // import React, { useContext, useEffect, useState } from "react";
 // import { Link, useLocation } from "react-router-dom";
 // import { AuthContext } from "../context/AuthContext";
@@ -374,7 +369,7 @@
 
 //       try {
 //         // This endpoint must exist in your backend.
-       
+
 //         const data = await apiRequest("GET", "/dashboard/stats");
 
 //         if (!active) return;
@@ -676,82 +671,71 @@
 // export default Dashboard;
 
 import React, { useContext, useState } from "react";
-import {
-  Link,
-  Outlet,
-  useLocation,
-} from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
-
-const menuGroups = [
-  {
-    title: "WORKSPACE",
-    items: [
-      {
-        name: "Dashboard",
-        path: "/dashboard",
-        icon: "▦",
-        roles: ["administrator", "admin", "manager", "employee"],
-      },
-      {
-        name: "Leads",
-        path: "/leads",
-        icon: "♧",
-        roles: ["administrator", "admin", "manager", "employee"],
-      },
-      {
-        name: "Assign Leads",
-        path: "/assign-lead",
-        icon: "⇄",
-        roles: ["administrator", "admin", "manager"],
-      },
-      {
-        name: "Follow-ups",
-        path: "/follow-ups",
-        icon: "◷",
-        roles: ["administrator", "admin", "manager", "employee"],
-      },
-      {
-        name: "Team Members",
-        path: "/team",
-        icon: "♙",
-        roles: ["administrator", "admin"],
-      },
-      {
-        name: "Create User",
-        path: "/team/create",
-        icon: "+",
-        roles: ["administrator", "admin"],
-      },
-    ],
-  },
-  {
-    title: "INSIGHTS",
-    items: [
-      {
-        name: "Reports",
-        path: "/reports",
-        icon: "▥",
-        roles: ["administrator", "admin", "manager", "employee"],
-      },
-      {
-        name: "Audit Logs",
-        path: "/audit-logs",
-        icon: "≋",
-        roles: ["administrator", "admin"],
-      },
-    ],
-  },
-];
+import { WorkspaceContext } from "../context/WorkCountContext";
 
 export default function MainLayout() {
+ 
   const { user, logout } = useContext(AuthContext);
+const { totalLeads,totalTeam } = useContext(WorkspaceContext);
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const menuGroups = [
+    {
+      title: "WORKSPACE",
+      items: [
+        {
+          name: "Dashboard",
+          path: "/dashboard",
+          icon: "▦",
+          roles: ["administrator", "admin", "manager", "employee"],
+        },
+        {
+          name: "Leads",
+          path: "/leads",
+          icon: "♧",
+          count: totalLeads,
+          roles: ["administrator", "admin", "manager", "employee"],
+        },
+        
+        {
+          name: "Follow-ups",
+          path: "/follow-up",
+          icon: "◷",
+          roles: ["administrator", "admin", "manager", "employee"],
+        },
+        {
+          name: "Team Members",
+          path: "/team",
+          icon: "♙",
+          count:totalTeam,
+          roles: ["administrator", "admin"],
+        },
+      ],
+    },
+    {
+      title: "INSIGHTS",
+      items: [
+        {
+          name: "Reports",
+          path: "/reports",
+          icon: "▥",
+          roles: ["administrator", "admin", "manager", "employee"],
+        },
+        {
+          name: "Audit Logs",
+          path: "/audit-logs",
+          icon: "≋",
+          roles: ["administrator", "admin"],
+        },
+      ],
+    },
+  ];
+
   const role = String(user?.role || "employee").toLowerCase();
-  const displayName =
-    user?.name || user?.username || user?.email || "User";
+  const displayName = user?.name || user?.username || user?.email || "User";
 
   const page = menuGroups
     .flatMap((group) => group.items)
@@ -776,9 +760,7 @@ export default function MainLayout() {
         className={`fixed inset-y-0 left-0 z-50 flex w-[260px]
           flex-col border-r border-slate-800 bg-[#11162d]
           text-white transition-transform duration-200
-          md:translate-x-0 ${
-            menuOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+          md:translate-x-0 ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <Link
           to="/dashboard"
@@ -786,8 +768,10 @@ export default function MainLayout() {
           className="flex h-[90px] shrink-0 items-center gap-3
             border-b border-slate-800 px-6"
         >
-          <span className="flex h-10 w-10 items-center justify-center
-            rounded-xl bg-indigo-500 text-2xl font-bold">
+          <span
+            className="flex h-10 w-10 items-center justify-center
+            rounded-xl bg-indigo-500 text-2xl font-bold"
+          >
             ⌘
           </span>
           <span>
@@ -799,32 +783,33 @@ export default function MainLayout() {
         </Link>
 
         <div className="flex-1 overflow-y-auto px-4 py-5">
-          <div className="mb-6 rounded-xl border border-slate-700
-            bg-white/5 p-3">
+          <div
+            className="mb-6 rounded-xl border border-slate-700
+            bg-white/5 p-3"
+          >
             <p className="font-semibold text-sm">LeadSphere Inc.</p>
-            <p className="mt-1 text-xs text-slate-400">
-              Free workspace
-            </p>
+            <p className="mt-1 text-xs text-slate-400">Free workspace</p>
           </div>
 
           {menuGroups.map((group) => {
             const items = group.items.filter((item) =>
-              item.roles.includes(role)
+              item.roles.includes(role),
             );
 
             if (!items.length) return null;
 
             return (
               <div key={group.title} className="mb-7">
-                <p className="mb-3 px-2 text-[10px] font-bold
-                  tracking-[2px] text-slate-500">
+                <p
+                  className="mb-3 px-2 text-[10px] font-bold
+                  tracking-[2px] text-slate-500"
+                >
                   {group.title}
                 </p>
 
                 <nav className="space-y-1">
                   {items.map((item) => {
-                    const active =
-                      location.pathname === item.path;
+                    const active = location.pathname === item.path;
 
                     return (
                       <Link
@@ -838,10 +823,20 @@ export default function MainLayout() {
                               : "text-slate-300 hover:bg-white/10 hover:text-white"
                           }`}
                       >
-                        <span className="w-5 text-center text-lg">
-                          {item.icon}
-                        </span>
-                        <span>{item.name}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="w-5 text-center text-lg">
+                            {item.icon}
+                          </span>
+                          <span>{item.name}</span>
+                        </div>
+                        {/* count badge show */}
+                        {
+                          item.count !== undefined &&(
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${active? "bg-white/20 text-white" : "bg-slate-800 text-slate-300"}`}>
+                              {item.count}
+                            </span>
+                          )
+                        }
                       </Link>
                     );
                   })}
@@ -853,17 +848,15 @@ export default function MainLayout() {
 
         <div className="shrink-0 border-t border-slate-800 p-4">
           <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center
-              justify-center rounded-full bg-indigo-400 font-bold">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center
+              justify-center rounded-full bg-indigo-400 font-bold"
+            >
               {displayName.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">
-                {displayName}
-              </p>
-              <p className="text-xs capitalize text-slate-400">
-                {role}
-              </p>
+              <p className="truncate text-sm font-semibold">{displayName}</p>
+              <p className="text-xs capitalize text-slate-400">{role}</p>
             </div>
           </div>
 
@@ -880,9 +873,11 @@ export default function MainLayout() {
 
       {/* Main page area */}
       <div className="min-h-screen min-w-0 md:ml-[260px]">
-        <header className="sticky top-0 z-30 flex h-[66px]
+        <header
+          className="sticky top-0 z-30 flex h-[66px]
           items-center justify-between border-b border-slate-200
-          bg-white/95 px-4 backdrop-blur md:px-8">
+          bg-white/95 px-4 backdrop-blur md:px-8"
+        >
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -895,13 +890,13 @@ export default function MainLayout() {
             </button>
 
             <div>
-              <p className="text-[10px] font-semibold tracking-[2px]
-                text-slate-400">
+              <p
+                className="text-[10px] font-semibold tracking-[2px]
+                text-slate-400"
+              >
                 WORKSPACE / {pageTitle.toUpperCase()}
               </p>
-              <h1 className="text-lg font-bold md:text-xl">
-                {pageTitle}
-              </h1>
+              <h1 className="text-lg font-bold md:text-xl">{pageTitle}</h1>
             </div>
           </div>
 
@@ -909,8 +904,10 @@ export default function MainLayout() {
             <span className="hidden text-sm text-slate-500 sm:block">
               {displayName}
             </span>
-            <div className="flex h-9 w-9 items-center justify-center
-              rounded-full bg-indigo-100 text-sm font-bold text-indigo-700">
+            <div
+              className="flex h-9 w-9 items-center justify-center
+              rounded-full bg-indigo-100 text-sm font-bold text-indigo-700"
+            >
               {displayName.charAt(0).toUpperCase()}
             </div>
           </div>
