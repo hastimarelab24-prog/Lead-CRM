@@ -1,9 +1,11 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const User = require("../models/TeamUser");
+const lead =require("../models/lead")
 const authMiddleware = require("../middleware/authMiddleware");
 const allowRole = require("../middleware/roleMiddleware");
 const logAction = require("../utils/auditLogger");
+const Lead = require("../models/lead");
 
 const router = express.Router();
 
@@ -46,10 +48,20 @@ router.get("/", allowRole("administrator", "manager", "employee"), async (req, r
       .sort({ createdAt: -1 })
       .lean();
 
+// count leads assigned to each team member
+const leadCount = await Lead.aggregate([{$match:{assignedEmployee:{$ne:null},},},
+  {$group:{_id:"$assignedEmployee", count:{$sum:1},}}
+])
+const countMap = new Map(leadCount.map((item)=>[String(item._id),item.count,]))
+// add assignedlead count to each 
+const usersWithLeadCounts=users.map((user)=>({
+  ...user, assignedLeadsCount:countMap.get(String(user._id)) ||0
+}))
+
     return res.status(200).json({
       success: true,
-      users,
-      employees:users
+      users:usersWithLeadCounts,
+      employees:usersWithLeadCounts
     });
   } catch (error) {
     console.error("Load users error:", error);
