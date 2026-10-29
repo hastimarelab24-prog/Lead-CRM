@@ -115,10 +115,10 @@ const { setTotalLeads } = useContext(WorkspaceContext);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 selection:bg-indigo-600">
-      <div className="max-w-9xl mx-auto space-y-8">
+    <div className="min-h-screen  bg-slate-50 text-slate-900 p-4 selection:bg-indigo-600">
+      <div className="max-w-9xl mx-auto space-y-0 ">
         {/* header  */}
-        <header className=" relative overflow-hidden  bg-white p-6 sm:p-8 shadow-sm  transition-all duration-300 hover:shadow-md">
+        <header className="mb-8  relative overflow-hidden  bg-white p-6 sm:p-8 shadow-sm  transition-all duration-300 hover:shadow-md">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="space-y-2">
               <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
@@ -131,7 +131,7 @@ const { setTotalLeads } = useContext(WorkspaceContext);
             </div>
             <button
               onClick={() => setModal({ isOpen: true, data: null })}
-              className="group relative inline-flex items-center justify-center gap-2 px-6  py-3.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/20  hover:shadow-xl hover:shadow-indigo-600/35 transition-all duration-300   hover:-translate-y-1 active:translate-y-0 active:scale-95 cursor-pointer"
+              className="group  relative inline-flex items-center justify-center gap-2 px-6  py-3.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/20  hover:shadow-xl hover:shadow-indigo-600/35 transition-all duration-300   hover:-translate-y-1 active:translate-y-0 active:scale-95 cursor-pointer"
             >
               <svg
                 className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90 
@@ -147,7 +147,7 @@ const { setTotalLeads } = useContext(WorkspaceContext);
                   d="M12 4v16m8-8H4"
                 />
               </svg>
-              <span className="tracking-wide">Onboard New Lead</span>
+              <span >Onboard New Lead</span>
             </button>
           </div>
 
@@ -175,7 +175,7 @@ const { setTotalLeads } = useContext(WorkspaceContext);
 
         {/* filter bar with hover Glows */}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md">
+        <div className=" grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md">
           <div className="relative md:col-span-6 grounp ">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-600 transition-colors duration-200">
               <svg
@@ -254,7 +254,7 @@ const { setTotalLeads } = useContext(WorkspaceContext);
 
         {/* main table container */}
         <div
-          className="relative rounded-2xl bg-white border border-slate-200 shadow-sm
+          className=" relative rounded-2xl bg-white border border-slate-200 shadow-sm
             hover:shadow-md transition-shadow duration-300 overflow-hidden"
         >
           {isLoading && (
@@ -277,7 +277,7 @@ const { setTotalLeads } = useContext(WorkspaceContext);
             </div>
           )}
 
-          <div className="p-1">
+          <div className="p-1 ">
             <LeadTable
               leads={leads}
               onEdit={(lead) => setModal({ isOpen: true, data: lead })}
