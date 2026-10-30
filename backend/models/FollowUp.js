@@ -1,4 +1,3 @@
-
 const mongoose = require("mongoose");
 
 const followUpSchema = new mongoose.Schema(
@@ -11,7 +10,7 @@ const followUpSchema = new mongoose.Schema(
     },
     title: {
       type: String,
-      required: [true,'Activity title is required.'],
+      required: [true, "Activity title is required."],
       trim: true,
     },
     type: {
@@ -21,7 +20,7 @@ const followUpSchema = new mongoose.Schema(
     },
     dueDate: {
       type: Date,
-      required: [true,'Due data is required'],
+      required: [true, "Due data is required"],
       index: true,
     },
     priority: {
@@ -34,38 +33,37 @@ const followUpSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TeamUser",
+    },
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TeamUser",
+    },
     status: {
       type: String,
       enum: ["pending", "completed", "cancelled"],
       default: "pending",
       index: true,
     },
-    assignedTo: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index:true,
-    },
     completedAt: {
       type: Date,
       default: null,
     },
-    notes:{
-      type:String,
-      default:"",
-      trim:true,
-    }
+    notes: {
+      type: String,
+      default: "",
+      trim: true,
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 followUpSchema.index({ status: 1, dueDate: 1, assignedTo: 1 });
 
-module.exports = mongoose.models.FollowUp ||
-  mongoose.model("FollowUp", followUpSchema,"followups");
+module.exports =
+  mongoose.models.FollowUp ||
+  mongoose.model("FollowUp", followUpSchema, "followups");

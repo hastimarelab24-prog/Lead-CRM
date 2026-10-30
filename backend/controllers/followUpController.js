@@ -2,11 +2,11 @@ const mongoose = require("mongoose");
 const FollowUp = require("../models/FollowUp");
 const Lead = require("../models/lead");
 const User = require("../models/TeamUser");
-const Notification = require("../models/Notification");
 const auditLogger = require("../utils/auditLogger");
 
 const validId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+// check lead access
 async function getAccessibleLead(req, leadId) {
   if (!validId(leadId)) return null;
 
@@ -40,14 +40,20 @@ async function getAccessibleLead(req, leadId) {
   return null;
 }
 
+// CHECK FOLLOW-UP ACCESS
 async function canAccessFollowUp(req, followUp) {
-  if (req.user.role === "administrator") return true;
+  if (req.user.role === "administrator") {
+    return true;
+  }
 
-  const lead = await getAccessibleLead(req, followUp.lead);
+  const leadId = followUp.lead?._id || followUp.lead;
+
+  const lead = await getAccessibleLead(req, leadId);
+
   if (!lead) return false;
 
   if (req.user.role === "employee") {
-    return String(followUp.assignedTo) === req.user.id;
+    return String(followUp.assignedTo) === String(req.user.id);
   }
 
   if (req.user.role === "manager") {
@@ -56,8 +62,8 @@ async function canAccessFollowUp(req, followUp) {
       .lean();
 
     return (
-      String(followUp.assignedTo) === req.user.id ||
-      String(assignee?.manager || "") === req.user.id
+      String(followUp.assignedTo) === String(req.user.id) ||
+      String(assignee?.manager || "") === String(req.user.id)
     );
   }
 
@@ -98,18 +104,19 @@ async function canAccessFollowUp(req, followUp) {
 exports.getAssignees = async (req, res) => {
   try {
     // Relax the filter to ensure users are returned even if isActive is missing or false
-    const users = await User.find({
-      $or: [
-        { isActive: true },
-        { isActive: { $exists: false } },
-        { iactive: true },
-      ],
-    })
+    // const users = await User.find({
+    //   $or: [
+    //     { isActive: true },
+    //     { isActive: { $exists: false } },
+    //     { iactive: true },
+    //   ],
+    // })
+    const users=await User.find({})
       .select("_id name email role isActive")
       .sort({ name: 1 })
       .lean();
 
-    return res.status(200).json({ success: true, users });
+    return res.status(200).json({ success: true, users ,assignees:users});
   } catch (error) {
     console.error("Error fetching users:", error);
     return res
@@ -232,27 +239,17 @@ const parsedDate = new Date(dueDate);
 };
 
 // GET /api/follow-ups?view=upcoming|overdue|completed
+
+// GET ALL FOLLOW-UPS
 exports.getFollowUps = async (req, res) => {
   try {
-    // const role = req.user.role;
     const filter = {};
 
-    // if (role === "employee") {
-    //   filter.assignedTo = req.user.id;
-    // } else if (role === "manager") {
-    //   const team = await User.find({
-    //     $or: [{ _id: req.user.id }, { manager: req.user.id }],
-    //     isActive: { $ne: false },
-    //   }).select("_id");
-
-    //   filter.  assignedTo = { $in: team.map((u) => u._id) };
-    // }
-
-    if (req.query.status && req.query.status.trim() !== "") {
-      // if (!["pending", "completed", "cancelled"].includes(req.query.status)) {
-      //   return res.status(400).json({ message: "Invalid status filter." });
-      // }
-      filter.status = new RefExp(`^${req.query.status}$`,"i");
+    if (req.query.status) {
+      filter.status = new RegExp(
+        `^${req.query.status}$`,
+        "i"
+      );
     }
 
     const now = new Date();
@@ -260,42 +257,91 @@ exports.getFollowUps = async (req, res) => {
     if (req.query.view === "upcoming") {
       filter.status = "pending";
       filter.dueDate = { $gte: now };
-    } else if (req.query.view === "overdue") {
+    }
+
+    if (req.query.view === "overdue") {
       filter.status = "pending";
       filter.dueDate = { $lt: now };
-    } else if (req.query.view === "completed") {
-      filter.status = "completed";
-    } 
-    // else if (req.query.view && req.query.view !== "all") {
-    //   return res.status(400).json({ message: "Invalid view filter." });
-    // }
+    }
 
-    // Also enforce lead-level permissions for non-admin users.
+    if (req.query.view === "completed") {
+      filter.status = "completed";
+    }
+
     let followUps = await FollowUp.find(filter)
-      .populate("lead", "name company email assignedEmployee")
+      .populate("lead", "name email phone company assignedEmployee")
       .populate("assignedTo", "name email role")
       .populate("createdBy", "name email")
-      .sort({ dueDate: 1 })
+      .sort({ dueDate: 1, createdAt: -1 })
       .lean();
 
-    // if (role !== "administrator") {
-    //   followUps = followUps.filter(async () => true);
-    //   const permitted = [];
+    // Apply lead access permissions
+    if (req.user.role !== "administrator") {
+      const permitted = [];
 
-    //   for (const item of followUps) {
-    //     const allowed = await getAccessibleLead(req, item.lead?._id);
-    //     if (allowed) permitted.push(item);
-    //   }
+      for (const item of followUps) {
+        const leadId = item.lead?._id || item.lead;
 
-    //   followUps = permitted;
-    // }
+        const accessibleLead = await getAccessibleLead(
+          req,
+          leadId
+        );
 
-    return res.json({ success: true, followUps });
+        if (accessibleLead) {
+          permitted.push(item);
+        }
+      }
+
+      followUps = permitted;
+    }
+
+    const pending = followUps.filter(
+      item => item.status?.toLowerCase() === "pending"
+    );
+
+    const completed = followUps.filter(
+      item => item.status?.toLowerCase() === "completed"
+    );
+
+    const cancelled = followUps.filter(
+      item => item.status?.toLowerCase() === "cancelled"
+    );
+
+    const overdue = pending.filter(
+      item => item.dueDate && new Date(item.dueDate) < now
+    );
+
+    const upcoming = pending.filter(
+      item => item.dueDate && new Date(item.dueDate) >= now
+    );
+
+    return res.status(200).json({
+      success: true,
+      followUps,
+      pending,
+      completed,
+      cancelled,
+      overdue,
+      upcoming,
+      counts: {
+        all: followUps.length,
+        pending: pending.length,
+        completed: completed.length,
+        cancelled: cancelled.length,
+        overdue: overdue.length
+      }
+    });
+
   } catch (error) {
-    console.error("Get follow-ups:", error);
-    return res.status(500).json({ message: "Failed to load follow-ups." });
+    console.error("Get Follow-ups Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to load follow-ups."
+    });
   }
 };
+
 
 
 
@@ -353,47 +399,59 @@ exports.updateFollowUp = async (req, res) => {
 };
 
 // PATCH /api/follow-ups/:id/complete
+
+// PATCH /api/follow-ups/:id/complete
 exports.completeFollowUp = async (req, res) => {
   try {
-    if (!validId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid follow-up ID." });
+    const { id } = req.params;
+
+    if (!validId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid follow-up ID."
+      });
     }
 
-    const followUp = await FollowUp.findById(req.params.id);
+    const followUp = await FollowUp.findById(id);
 
-    if (!followUp || !(await canAccessFollowUp(req, followUp))) {
+    if (
+      !followUp ||
+      !(await canAccessFollowUp(req, followUp))
+    ) {
       return res.status(404).json({
-        message: "Follow-up not found or access denied.",
+        success: false,
+        message: "Follow-up not found or access denied."
       });
     }
 
     if (followUp.status === "cancelled") {
       return res.status(400).json({
-        message: "Cancelled follow-ups cannot be completed.",
+        success: false,
+        message: "Cancelled follow-up cannot be completed."
       });
     }
 
     followUp.status = "completed";
     followUp.completedAt = new Date();
+
     await followUp.save();
 
-    await auditLogger({
-      actor: req.user.id,
-      action: "FOLLOW_UP_COMPLETED",
-      entity: "FollowUp",
-      entityId: followUp._id,
+    return res.status(200).json({
+      success: true,
+      message: "Follow-up completed successfully.",
+      followUp
     });
 
-    return res.json({
-      success: true,
-      message: "Follow-up completed.",
-      followUp,
-    });
   } catch (error) {
-    console.error("Complete follow-up:", error);
-    return res.status(500).json({ message: "Failed to complete follow-up." });
+    console.error("Complete Follow-up Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
+
 
 // DELETE /api/follow-ups/:id
 exports.deleteFollowUp = async (req, res) => {

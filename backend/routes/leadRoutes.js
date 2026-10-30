@@ -8,33 +8,34 @@ const FollowUp = require("../models/FollowUp");
 const User = require("../models/TeamUser");
 const verifyToken = require("../middleware/authMiddleware");
 
-
 const authMiddleware = require("../middleware/authMiddleware");
 const allowRoles = require("../middleware/roleMiddleware");
 
-// Import controller functions correctly
-const {
-  getLeads,
-  createLead,
-  updatedLead,
-  transitionStatus,
-  deleteLead,
-  getFollowUps,
-  updateFollowUpStatus,
-} = require("../controllers/leadController");
+// Import controller functions safely (fallback to empty functions if undefined)
+// Import controller functions safely
+const leadController = require("../controllers/leadController");
 
+const {
+  getLeads = (req, res) => res.status(501).json({ message: "Not implemented" }),
+  createLead = (req, res) => res.status(501).json({ message: "Not implemented" }),
+  updateLead,
+  updatedLead = updateLead || leadController.updateLead || ((req, res) => res.status(501).json({ message: "Not implemented" })),
+  transitionStatus = (req, res) => res.status(501).json({ message: "Not implemented" }),
+  deleteLead = (req, res) => res.status(501).json({ message: "Not implemented" }),
+  getFollowUps = (req, res) => res.status(501).json({ message: "Not implemented" }),
+  updateFollowUpStatus = (req, res) => res.status(501).json({ message: "Not implemented" }),
+} = leadController;
 const logActive = require("../utils/auditLogger");
 
 // Require login for all lead routes.
 router.use(authMiddleware);
 
-// View and create leads
+// 
+// 1. SPECIFIC / STATIC ROUTES FIRST (IMPORTANT)
+// 
 router.route("/").get(getLeads).post(createLead);
-// folow-up spefific router // Follow-up specific routes inside leadRoutes.js
 router.get("/follow-ups/all", getFollowUps);
 router.put("/follow-ups/:id", updateFollowUpStatus);
-
-//  Aa route ahiya add karo (Lead routes ni andar j):
 
 router.delete("/follow-ups/:id", async (req, res) => {
   try {
@@ -72,7 +73,6 @@ router.delete("/follow-ups/:id", async (req, res) => {
     });
   } catch (error) {
     console.error("Delete follow-up error:", error);
-
     return res.status(500).json({
       success: false,
       message: "Failed to remove follow-up.",
@@ -80,13 +80,9 @@ router.delete("/follow-ups/:id", async (req, res) => {
   }
 });
 
-// Update and delete a lead
-router.route("/:id").put(updatedLead).delete(deleteLead);
-
-// Change lead status
-router.patch("/:id/status", transitionStatus);
-
-// Assign a lead to an active employee
+// 
+// 2. ASSIGN & STATUS PATCH ROUTES
+// 
 router.patch(
   "/:id/assign",
   allowRoles("administrator", "manager"),
@@ -128,7 +124,6 @@ router.patch(
       }
 
       const previousEmployee = lead.assignedEmployee?.toString() || null;
-
       lead.assignedEmployee = employee._id;
 
       await lead.save();
@@ -156,7 +151,6 @@ router.patch(
       });
     } catch (error) {
       console.error("Assign lead error:", error);
-
       return res.status(500).json({
         message: "Failed to assign lead.",
         error: error.message,
@@ -164,5 +158,12 @@ router.patch(
     }
   }
 );
+
+router.patch("/:id/status", transitionStatus);
+
+// 
+// 3. DYNAMIC /:id ROUTES LAST
+// 
+router.route("/:id").put(updatedLead).delete(deleteLead);
 
 module.exports = router;
