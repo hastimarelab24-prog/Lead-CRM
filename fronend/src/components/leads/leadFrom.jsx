@@ -1,7 +1,5 @@
-
 import React, { useEffect, useState } from "react";
 import { apiRequest } from "../../api/api";
-import { data } from "react-router-dom";
 
 const SOURCES = [
   "website",
@@ -21,7 +19,84 @@ const STATUSES = [
   "won",
 ];
 
-const INITIAL_FORM = { name: "", company: "", email: "", phone: "", source: "", status: "new", assignedEmployee: "", followUpDate: "", followUpTime:"", followUpType:"", priority: "Medium", followUpNote: "",
+const createEmptyFollowUp = () => ({
+  title: "",
+  dueDate: "",
+  dueTime: "",
+  type: "call",
+  priority: "Medium",
+  notes: "",
+});
+
+const INITIAL_FORM = {
+  name: "",
+  company: "",
+  email: "",
+  phone: "",
+  source: "",
+  status: "new",
+  assignedEmployee: "",
+  followUps: [createEmptyFollowUp()],
+};
+
+// Format date for HTML date input using local time.
+const formatDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const formatTime = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes()
+  ).padStart(2, "0")}`;
+};
+
+// Convert existing follow-up data into editable rows.
+const getInitialFollowUps = (initialData) => {
+  if (Array.isArray(initialData?.followUps) && initialData.followUps.length) {
+    return initialData.followUps.map((item) => {
+      const dateValue = item.dueDate || item.followUpDate || "";
+
+      return {
+        title: item.title || "",
+        dueDate: formatDate(dateValue),
+        dueTime: item.dueTime || formatTime(dateValue),
+        type: String(item.type || item.activityType || "call").toLowerCase(),
+        priority: item.priority || "Medium",
+        notes: item.notes || item.followUpNote || "",
+      };
+    });
+  }
+
+  // Backward compatibility with old single follow-up data.
+  if (initialData?.followUpDate) {
+    return [
+      {
+        title: initialData.followUpTitle || "Scheduled Follow-up",
+        dueDate: formatDate(initialData.followUpDate),
+        dueTime:
+          initialData.followUpTime || formatTime(initialData.followUpDate),
+        type: String(
+          initialData.activityType || initialData.followUpType || "call"
+        ).toLowerCase(),
+        priority: initialData.priority || "Medium",
+        notes: initialData.followUpNote || "",
+      },
+    ];
+  }
+
+  return [createEmptyFollowUp()];
 };
 
 export default function LeadForm({
@@ -36,17 +111,18 @@ export default function LeadForm({
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
 
-  // Load active employees
+  // Load employees.
   useEffect(() => {
     let cancelled = false;
 
     const fetchEmployees = async () => {
       try {
         setLoadingEmployees(true);
-        const data = await apiRequest("get", "/users/employees");
-        const users = Array.isArray(data)
-          ? data
-          : data?.users || data?.data || [];
+        const response = await apiRequest("get", "/users/employees");
+
+        const users = Array.isArray(response)
+          ? response
+          : response?.users || response?.data?.users || response?.data || [];
 
         const employeeList = users.filter(
           (user) =>
@@ -83,25 +159,13 @@ export default function LeadForm({
     };
   }, []);
 
-  // Load initial data when editing
+  // Load initial data and follow-ups when editing.
   useEffect(() => {
     if (initialData) {
       const assignedEmployee =
         typeof initialData.assignedEmployee === "object"
           ? initialData.assignedEmployee?._id || ""
           : initialData.assignedEmployee || "";
-
-      let formattedDate = ""; let formattedTime= "";
-      const dataeObje=new Date(initialData.followUpDate);
-      if(!isNaN(dataeObje)){
-        formattedDate = dataeObje.toISOString().split("T")[0];
-        formattedTime= dataeObje.toTimeString().substring(0,5)
-      }
-      // if (initialData.followUpDate) {
-      //   formattedDate = initialData.followUpDate.includes("T")
-      //     ? initialData.followUpDate.split("T")[0]
-      //     : initialData.followUpDate.substring(0, 10);
-      // }
 
       setFormData({
         name: initialData.name || "",
@@ -111,20 +175,20 @@ export default function LeadForm({
         source: initialData.source || "",
         status: initialData.status || "new",
         assignedEmployee,
-        followUpDate: formattedDate,
-        followUpTime:formattedTime || initialData.followUpTime || "",
-        activityTYpe:initialData.activityTYpe || "Call",
-        priority: initialData.priority || "Medium",
-        followUpNote: initialData.followUpNote || "",
+        followUps: getInitialFollowUps(initialData),
       });
     } else {
-      setFormData({ ...INITIAL_FORM });
+      setFormData({
+        ...INITIAL_FORM,
+        followUps: [createEmptyFollowUp()],
+      });
     }
 
     setErrors({});
     setSubmitError("");
   }, [initialData]);
 
+  // Basic lead field changes.
   const handleChange = (event) => {
     const { name, value } = event.target;
 
@@ -141,6 +205,50 @@ export default function LeadForm({
     setSubmitError("");
   };
 
+  // Update individual follow-up fields.
+  const handleFollowUpChange = (index, field, value) => {
+    setFormData((previous) => ({
+      ...previous,
+      followUps: previous.followUps.map((followUp, i) =>
+        i === index
+          ? {
+              ...followUp,
+              [field]: value,
+            }
+          : followUp
+      ),
+    }));
+
+    setErrors((previous) => ({
+      ...previous,
+      [`followUps.${index}.${field}`]: "",
+    }));
+
+    setSubmitError("");
+  };
+
+  // Add multiple follow-up rows.
+  const addFollowUpRow = () => {
+    setFormData((previous) => ({
+      ...previous,
+      followUps: [
+        ...previous.followUps,
+        createEmptyFollowUp(),
+      ],
+    }));
+  };
+
+  // Remove a follow-up row.
+  const removeFollowUpRow = (index) => {
+    setFormData((previous) => ({
+      ...previous,
+      followUps: previous.followUps.filter((_, i) => i !== index),
+    }));
+
+    setErrors({});
+  };
+
+  // Validate lead and follow-up data.
   const validateForm = () => {
     const nextErrors = {};
 
@@ -168,6 +276,33 @@ export default function LeadForm({
       nextErrors.assignedEmployee = "Please select an employee.";
     }
 
+    formData.followUps.forEach((followUp, index) => {
+      const hasContent =
+        followUp.title.trim() ||
+        followUp.dueDate ||
+        followUp.dueTime ||
+        followUp.notes.trim();
+
+      if (!hasContent) return;
+
+      if (!followUp.title.trim()) {
+        nextErrors[`followUps.${index}.title`] =
+          "Follow-up title is required.";
+      }
+
+      if (!followUp.dueDate) {
+        nextErrors[`followUps.${index}.dueDate`] =
+          "Follow-up date is required.";
+      }
+
+      if (
+        !["call", "email", "meeting", "task"].includes(followUp.type)
+      ) {
+        nextErrors[`followUps.${index}.type`] =
+          "Please select a valid activity type.";
+      }
+    });
+
     return nextErrors;
   };
 
@@ -186,11 +321,32 @@ export default function LeadForm({
       return;
     }
 
-    let cominedDateTime = null;
-    if(formData.followUpDate){
-      const timeString = formData.followUpTime ? formData.followUpTime :"00:00";
-      cominedDateTime=new Date(`${formData.followUpDate }T${timeString}:00`).toISOString()
-    }
+    // Convert follow-up date and time to ISO format.
+    const formattedFollowUps = formData.followUps
+      .filter(
+        (item) =>
+          item.title.trim() ||
+          item.dueDate ||
+          item.dueTime ||
+          item.notes.trim()
+      )
+      .map((item) => {
+        const dateTime = new Date(
+          `${item.dueDate}T${item.dueTime || "00:00"}:00`
+        );
+
+        return {
+          title: item.title.trim(),
+          dueDate: dateTime.toISOString(),
+          type: item.type,
+          activityType: item.type,
+          priority: item.priority.toLowerCase(),
+          notes: item.notes.trim(),
+        };
+      });
+
+    const firstFollowUp = formattedFollowUps[0] || null;
+
     const payload = {
       name: formData.name.trim(),
       company: formData.company.trim(),
@@ -199,10 +355,14 @@ export default function LeadForm({
       source: formData.source,
       status: formData.status,
       assignedEmployee: formData.assignedEmployee,
-      followUpDate: cominedDateTime,
-      activityTYpe:formData.activityTYpe,
-      priority: formData.priority,
-      followUpNote: formData.followUpNote.trim(),
+      followUps: formattedFollowUps,
+      followUpDate: firstFollowUp?.dueDate || null,
+      followUpTime: firstFollowUp
+        ? firstFollowUp.dueDate.substring(11, 16)
+        : "",
+      activityType: firstFollowUp?.type || "",
+      priority: firstFollowUp?.priority || "medium",
+      followUpNote: firstFollowUp?.notes || "",
     };
 
     try {
@@ -253,7 +413,7 @@ export default function LeadForm({
           {initialData ? "Update Lead" : "Register New Lead"}
         </h2>
         <p className="mt-1 text-sm text-gray-500">
-          Enter lead details and select an employee.
+          Enter lead details, select an employee and schedule follow-ups.
         </p>
       </div>
 
@@ -266,6 +426,7 @@ export default function LeadForm({
         </div>
       )}
 
+      {/* Name */}
       <div>
         <label htmlFor="name" className={labelClass}>
           Full Name *
@@ -284,6 +445,7 @@ export default function LeadForm({
         {renderError("name")}
       </div>
 
+      {/* Company */}
       <div>
         <label htmlFor="company" className={labelClass}>
           Company
@@ -298,6 +460,7 @@ export default function LeadForm({
         />
       </div>
 
+      {/* Email */}
       <div>
         <label htmlFor="email" className={labelClass}>
           Email Address *
@@ -316,6 +479,7 @@ export default function LeadForm({
         {renderError("email")}
       </div>
 
+      {/* Phone */}
       <div>
         <label htmlFor="phone" className={labelClass}>
           Phone Number
@@ -331,6 +495,7 @@ export default function LeadForm({
         />
       </div>
 
+      {/* Lead Source */}
       <div>
         <label htmlFor="source" className={labelClass}>
           Lead Source *
@@ -354,6 +519,7 @@ export default function LeadForm({
         {renderError("source")}
       </div>
 
+      {/* Lead Status */}
       <div>
         <label htmlFor="status" className={labelClass}>
           Lead Status *
@@ -376,6 +542,7 @@ export default function LeadForm({
         {renderError("status")}
       </div>
 
+      {/* Assigned Employee */}
       <div>
         <label htmlFor="assignedEmployee" className={labelClass}>
           Assigned Employee *
@@ -394,10 +561,9 @@ export default function LeadForm({
             {loadingEmployees
               ? "Loading employees..."
               : employees.length
-                ? "Select Employee"
-                : "No active employees found"}
+              ? "Select Employee"
+              : "No active employees found"}
           </option>
-
           {employees.map((employee) => (
             <option
               key={employee._id || employee.id}
@@ -410,54 +576,148 @@ export default function LeadForm({
         {renderError("assignedEmployee")}
       </div>
 
-      {/* Follow-up Section */}
-      <div className="border-t pt-4">
-        <h4 className="text-md font-bold text-gray-800 mb-3">Follow-up Details</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Multiple Follow-ups Section */}
+      <div className="border-t border-gray-200 pt-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <label className={labelClass}>Follow-up Date</label>
-            <input 
-              type="date" 
-              name="followUpDate" 
-              value={formData.followUpDate} 
-              onChange={handleChange} 
-              className={inputClass} 
-            />
+            <h3 className="text-lg font-bold text-gray-800">
+              Follow-up Details
+            </h3>
+            <p className="mt-1 text-xs text-gray-500">
+              Add multiple follow-up activities for this lead.
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={addFollowUpRow}
+            disabled={saving}
+            className="rounded-lg bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-100 disabled:opacity-50"
+          >
+            + Add Follow-up
+          </button>
+        </div>
 
-          <div>
-            <label htmlFor="" className={labelClass}> Time</label>
-            <input type="time" name="FollowupTime" value={formData.followUpTime} onChange={handleChange} className={inputClass} />
-          </div>
-
-          <div>
-            <label className={labelClass}>Priority</label>
-            <select 
-              name="priority" 
-              value={formData.priority} 
-              onChange={handleChange} 
-              className={inputClass}
+        <div className="space-y-4">
+          {formData.followUps.map((followUp, index) => (
+            <div
+              key={index}
+              className="relative space-y-3 rounded-xl border border-gray-200 bg-slate-50 p-4"
             >
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-            </select>
-          </div>
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-700">
+                  Follow-up #{index + 1}
+                </h4>
+                {formData.followUps.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeFollowUpRow(index)}
+                    disabled={saving}
+                    className="text-xs font-semibold text-red-600 hover:text-red-800"
+                  >
+                    <span className="mr-1">✕</span> Remove
+                  </button>
+                )}
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className={labelClass}>Follow-up Title *</label>
+                <input
+                  type="text"
+                  value={followUp.title}
+                  onChange={(e) =>
+                    handleFollowUpChange(index, "title", e.target.value)
+                  }
+                  placeholder="Enter follow-up title"
+                  className={inputClass}
+                />
+                {renderError(`followUps.${index}.title`)}
+              </div>
+
+              {/* Date & Time */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className={labelClass}>Follow-up Date *</label>
+                  <input
+                    type="date"
+                    value={followUp.dueDate}
+                    onChange={(e) =>
+                      handleFollowUpChange(index, "dueDate", e.target.value)
+                    }
+                    className={inputClass}
+                  />
+                  {renderError(`followUps.${index}.dueDate`)}
+                </div>
+                <div>
+                  <label className={labelClass}>Follow-up Time</label>
+                  <input
+                    type="time"
+                    value={followUp.dueTime}
+                    onChange={(e) =>
+                      handleFollowUpChange(index, "dueTime", e.target.value)
+                    }
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              {/* Type & Priority */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className={labelClass}>Activity Type</label>
+                  <select
+                    value={followUp.type}
+                    onChange={(e) =>
+                      handleFollowUpChange(index, "type", e.target.value)
+                    }
+                    className={inputClass}
+                  >
+                    <option value="call">Call</option>
+                    <option value="email">Email</option>
+                    <option value="meeting">Meeting</option>
+                    <option value="task">Task</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Priority</label>
+                  <select
+                    value={followUp.priority}
+                    onChange={(e) =>
+                      handleFollowUpChange(index, "priority", e.target.value)
+                    }
+                    className={inputClass}
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className={labelClass}>Follow-up Notes</label>
+                <textarea
+                  value={followUp.notes}
+                  onChange={(e) =>
+                    handleFollowUpChange(index, "notes", e.target.value)
+                  }
+                  placeholder="Enter follow-up remarks..."
+                  rows={2}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="mt-3">
-          <label className={labelClass}>Follow-up Note</label>
-          <textarea 
-            name="followUpNote" 
-            value={formData.followUpNote} 
-            onChange={handleChange} 
-            placeholder="enter follow-ups remarks.."
-            rows={3} 
-            className={inputClass} 
-          />
-        </div>
+        <p className="mt-3 text-xs text-gray-500">
+          Total Follow-ups: {formData.followUps.length}
+        </p>
       </div>
 
+      {/* Footer */}
       <div className="flex flex-col-reverse gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
         <button
           type="button"
@@ -467,17 +727,12 @@ export default function LeadForm({
         >
           Cancel
         </button>
-
         <button
           type="submit"
           disabled={saving || loadingEmployees}
           className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving
-            ? "Saving..."
-            : initialData
-              ? "Update Lead"
-              : "Save Lead"}
+          {saving ? "Saving..." : initialData ? "Update Lead" : "Save Lead"}
         </button>
       </div>
     </form>

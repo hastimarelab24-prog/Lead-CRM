@@ -11,12 +11,16 @@ fetchLeads: async (filters = {}) => {
   if (!token) {
     throw new Error("Please login again.");
   }
+  
 
   const response = await axios.get(API_URL, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    params: filters,
+    params: {
+      limit:10,
+      ...filters,
+    }
   });
 
   console.log("GET /api/leads response:", response.data);

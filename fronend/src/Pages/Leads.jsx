@@ -4,19 +4,18 @@ import LeadTable from "../components/leads/LeadTable";
 import LeadModal from "../components/leads/LeadModal";
 import LeadForm from "../components/leads/leadFrom"; // Matches the misspelled file on disk
 import Pagination from "../components/common/pagination";
-import { data } from "react-router-dom";
 import { WorkspaceContext } from "../context/WorkCountContext";
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
-const [currentPage, setCurrentPage] = useState(1);
-const { setTotalLeads } = useContext(WorkspaceContext);
+  const { setTotalLeads } = useContext(WorkspaceContext);
   const [pagination, setPagination] = useState({
     totalPages: 1,
     totalItems: 0,
-    currentPage:1,
+    currentPage: 1,
+    limit: 10,
   });
-  const itemsPerPage=10
+
   const [filters, setFilters] = useState({
     search: "",
     status: "",
@@ -34,41 +33,62 @@ const { setTotalLeads } = useContext(WorkspaceContext);
   //     setPagination(data.pagination);
   //   } catch (err) { console.error(err); }
   // };
+
   const loadLeads = useCallback(async () => {
     setIsLoading(true);
+
     try {
-      const response = await leadService.fetchLeads(filters);
+      const response = await leadService.fetchLeads({
+        ...filters,
+        page: filters.page,
+        limit: 10,
+      });
 
-      console.log("Full API Response Data:", response);
+      console.log("API RESPONSE:", response);
+      console.log("LEADS COUNT:", response?.leads?.length);
+      console.log("PAGINATION DATA:", response?.pagination);
 
-      let leadsData = [];
-      if (Array.isArray(response)) {
-        leadsData = response;
-      } else if (response && Array.isArray(response.leads)) {
-        leadsData = response.leads;
-      } else if (response && Array.isArray(response.data)) {
-        leadsData = response.data;
+      // Support both Axios response and response.data formats
+      const result = response?.data ?? response;
+
+      const leadsData = Array.isArray(result?.leads) ? result.leads : [];
+
+      const apiPagination = result?.pagination || {};
+
+      const totalItems = Number(
+        apiPagination.totalLeads ?? apiPagination.totalItems ?? 0,
+      );
+
+      const totalPages = Math.ceil(totalItems / 10);
+
+      // If the last record of a page is deleted,
+      // move back to the last available page.
+      if (totalPages > 0 && filters.page > totalPages) {
+        setFilters((prev) => ({
+          ...prev,
+          page: totalPages,
+        }));
+        return;
       }
 
       setLeads(leadsData);
 
-     const pageDate=
-        response?.pagination || {
-          currentPage: filters.page || 1,
-          totalPages: Math.max(1,Math.ceil(leadsData.length / itemsPerPage)),
-          totalItems: leadsData.length,
-        }
+      setPagination({
+        currentPage: filters.page,
+        totalPage: totalPages,
+        totalPages: totalPages,
+        totalLeads: totalItems,
+        totalItems: totalItems,
+        limit: 10,
+      });
 
-        setPagination(pageDate);
-        setCurrentPage(pageDate.currentPage || filters.page || 1);
-        setTotalLeads(pageDate.totalItems ?? leadsData.length);
-      
+      setTotalLeads(totalItems);
     } catch (err) {
       console.error("Load leads failed:", err.response?.data || err.message);
     } finally {
       setIsLoading(false);
     }
-  }, [filters,setTotalLeads]);
+  }, [filters, setTotalLeads]);
 
   useEffect(() => {
     loadLeads();
@@ -77,14 +97,36 @@ const { setTotalLeads } = useContext(WorkspaceContext);
   const handleFormSubmit = async (formData) => {
     try {
       if (modal.data) {
+        // Update existing lead
         await leadService.updateLead(modal.data._id, formData);
+
+        setModal({
+          isOpen: false,
+          data: null,
+        });
+
+        await loadLeads();
       } else {
+        // Create new lead
         await leadService.createLead(formData);
+
+        setModal({
+          isOpen: false,
+          data: null,
+        });
+
+        // New lead should appear on Page 1
+        setFilters((prev) => ({
+          ...prev,
+          page: 1,
+        }));
       }
-      setModal({ isOpen: false, data: null });
-      loadLeads();
     } catch (err) {
       console.error("Submit failed:", err);
+
+      alert(
+        err.response?.data?.message || "Unable to save lead. Please try again.",
+      );
     }
   };
 
@@ -116,6 +158,17 @@ const { setTotalLeads } = useContext(WorkspaceContext);
 
   const handleView = (lead) => {
     setViewModal({ isOpen: true, data: lead });
+  };
+  // Replace handlePageChange with this:
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > pagination.totalPages) {
+      return;
+    }
+
+    setFilters((prev) => ({
+      ...prev,
+      page: newPage,
+    }));
   };
 
   return (
@@ -151,7 +204,7 @@ const { setTotalLeads } = useContext(WorkspaceContext);
                   d="M12 4v16m8-8H4"
                 />
               </svg>
-              <span >Onboard New Lead</span>
+              <span>Onboard New Lead</span>
             </button>
           </div>
 
@@ -187,11 +240,13 @@ const { setTotalLeads } = useContext(WorkspaceContext);
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                strokeWidth={2}
               >
+                <circle cx="11" cy="11" r="8" />
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M21 21L-6-5a7 7 11-14 0 7 7 0 0114 0z"
+                  d="m21 21-4.35-4.35"
                 />
               </svg>
             </div>
@@ -283,7 +338,7 @@ const { setTotalLeads } = useContext(WorkspaceContext);
 
           <div className="p-1 ">
             <LeadTable
-              leads={leads.slice((currentPage-1)*itemsPerPage,currentPage*itemsPerPage)}
+              leads={leads}
               onEdit={(lead) => setModal({ isOpen: true, data: lead })}
               onDelete={handleDelete}
               onStatusChange={handleStatusChange}
@@ -294,7 +349,7 @@ const { setTotalLeads } = useContext(WorkspaceContext);
           <div className="p-4 border-t border-slate-100 bg-slate-50/50">
             <Pagination
               pagination={pagination}
-              onPageChange={(page) => setFilters((prev) => ({ ...prev, page }))}
+              onPageChange={handlePageChange}
             />
           </div>
         </div>
