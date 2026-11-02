@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useContext } from "react";
 import { leadService } from "../services/leadService";
 import LeadTable from "../components/leads/LeadTable";
 import LeadModal from "../components/leads/LeadModal";
-import LeadForm from "../components/leads/leadFrom"; // Matches the misspelled file on disk
+import LeadForm from "../components/leads/leadFrom"; 
 import Pagination from "../components/common/pagination";
 import { WorkspaceContext } from "../context/WorkCountContext";
 

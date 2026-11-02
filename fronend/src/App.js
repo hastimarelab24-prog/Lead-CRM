@@ -19,6 +19,7 @@ import AssignLead from "./Pages/AssignLead";
 import AuditLogs from "./Pages/AuditLogs";
 import CreateUser from "./Pages/CreateUser";
 import FollowUps from "./Pages/FollowUp";
+import DashboardHome from "./Pages/DashboardHome";
 import LeadActivity from "./Pages/LeadActivity";
 
 function App() {
@@ -37,7 +38,7 @@ function App() {
           <Route element={<Dashboard />}>
             <Route
               path="/dashboard"
-              // element={<Dashboard />}
+              element={<DashboardHome />}
             />
 
             <Route path="/leads" element={<Leads />} />

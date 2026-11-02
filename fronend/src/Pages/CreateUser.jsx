@@ -1,10 +1,8 @@
+
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../api/api";
 
 const CreateUser = ({ isOpen, onClose, onSuccess }) => {
-  const navigate = useNavigate();
-
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -14,29 +12,38 @@ const CreateUser = ({ isOpen, onClose, onSuccess }) => {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
   if (!isOpen) return null;
+
   const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setError("");
+    setLoading(true);
 
     try {
-      setError("");
-      setLoading(true);
-
-      const data = await apiRequest("/users", "post", {
-        name: form.name,
-        email: form.email,
+      const result = await apiRequest("/users", "POST", {
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
         password: form.password,
         role: form.role,
       });
-      alert(data.message || "team member created SUCCESSFULLY!");
+
+      if (result?.success === false) {
+        throw new Error(
+          result.message || "Failed to create team member."
+        );
+      }
+
       setForm({
         name: "",
         email: "",
@@ -44,100 +51,124 @@ const CreateUser = ({ isOpen, onClose, onSuccess }) => {
         role: "employee",
       });
 
-      if (onSuccess) onSuccess();
-      if (onClose) onClose();
-      // navigate("/team");
-    } catch (error) {
-      console.error("Create user failed:", error.response?.data || error);
+      if (onSuccess) {
+        await onSuccess(result);
+      }
+
+    } catch (err) {
+      console.error(
+        "Create user failed:",
+        err.response?.data || err
+      );
 
       setError(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          error.message ||
-          "Failed to create user",
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          err.message ||
+          "Failed to create user."
       );
     } finally {
       setLoading(false);
     }
   };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 sm:p-8 space-y-6">
-        <div className="flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 sm:p-8">
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+
           <div>
             <h3 className="text-xl font-bold text-slate-900">
-              Add team member
+              Add Team Member
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+
+            <p className="text-xs text-slate-500 mt-1">
               Create a new team record and assign system roles.
             </p>
           </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
+            disabled={loading}
+            className="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-100"
           >
             ✕
           </button>
+
         </div>
 
+        {/* Error Message */}
         {error && (
-          <div className="p-3 bg-rose-50 border-rose-200 text-rose-700 text-xs rounded-lg">
+          <div className="p-3 mb-4 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-lg">
             {error}
           </div>
         )}
 
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Name */}
           <div>
-            <label className="block  text-xs font-semibold text-slate-700 uppercase mb-1">
+            <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
               Full Name
             </label>
+
             <input
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 rounded-xl text-sm outline-none"
               name="name"
               type="text"
-              placeholder="e.g. enter name"
+              placeholder="Enter full name"
               value={form.name}
               onChange={handleChange}
               required
             />
           </div>
 
-          <div className="mb-3">
-            <label className="block  text-xs font-semibold text-slate-700 uppercase mb-1">
+          {/* Email */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
               Email
             </label>
+
             <input
               type="email"
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 rounded-xl text-sm outline-none"
               name="email"
               value={form.email}
-              placeholder="enter Your email "
+              placeholder="Enter email"
               onChange={handleChange}
               required
             />
           </div>
 
-          <div className="mb-3">
-            <label className="block  text-xs font-semibold text-slate-700 uppercase mb-1">
+          {/* Password */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
               Temporary Password
             </label>
+
             <input
               type="password"
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 rounded-xl text-sm outline-none"
               name="password"
               minLength={8}
-              placeholder="Enter Password"
+              placeholder="Enter password"
               value={form.password}
               onChange={handleChange}
               required
             />
           </div>
 
-          <div className="mb-3">
-            <label className="block  text-xs font-semibold text-slate-700 uppercase mb-1">
+          {/* Role */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
               Role
             </label>
+
             <select
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 rounded-xl text-sm outline-none"
               name="role"
@@ -150,21 +181,30 @@ const CreateUser = ({ isOpen, onClose, onSuccess }) => {
             </select>
           </div>
 
+          {/* Buttons */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+
             <button
               type="button"
-              className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer"
               onClick={onClose}
+              disabled={loading}
+              className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold"
             >
               Cancel
             </button>
-            <button className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 transition-all disabled:opacity-50 cursor-pointer text-white text-xs font-semibold shadow-lg shadow-indigo-600/20" 
-            disabled={loading}>
-            {loading ? "Creating..." : "Create User"}
-          </button>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold shadow-lg"
+            >
+              {loading ? "Creating..." : "Create User"}
+            </button>
+
           </div>
-          
+
         </form>
+
       </div>
     </div>
   );
