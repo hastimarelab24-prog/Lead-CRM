@@ -5,38 +5,32 @@ const router = express.Router();
 
 const Lead = require("../models/lead");
 const FollowUp = require("../models/FollowUp");
-const User = require("../models/TeamUser");
-const verifyToken = require("../middleware/authMiddleware");
 
 const authMiddleware = require("../middleware/authMiddleware");
 const allowRoles = require("../middleware/roleMiddleware");
 
-// Import controller functions safely (fallback to empty functions if undefined)
-// Import controller functions safely
 const leadController = require("../controllers/leadController");
-
-const {
-  getLeads = (req, res) => res.status(501).json({ message: "Not implemented" }),
-  createLead = (req, res) => res.status(501).json({ message: "Not implemented" }),
-  updateLead,
-  updatedLead = updateLead || leadController.updateLead || ((req, res) => res.status(501).json({ message: "Not implemented" })),
-  transitionStatus = (req, res) => res.status(501).json({ message: "Not implemented" }),
-  deleteLead = (req, res) => res.status(501).json({ message: "Not implemented" }),
-  getFollowUps = (req, res) => res.status(501).json({ message: "Not implemented" }),
-  updateFollowUpStatus = (req, res) => res.status(501).json({ message: "Not implemented" }),
-} = leadController;
 const logActive = require("../utils/auditLogger");
 
-// Require login for all lead routes.
+// Authentication for all routes
 router.use(authMiddleware);
 
-// 
-// 1. SPECIFIC / STATIC ROUTES FIRST (IMPORTANT)
-// 
-router.route("/").get(getLeads).post(createLead);
-router.get("/follow-ups/all", getFollowUps);
-router.put("/follow-ups/:id", updateFollowUpStatus);
+// GET all leads and CREATE lead
+router
+  .route("/")
+  .get(leadController.getLeads)
+  .post(leadController.createLead);
 
+// GET all follow-ups
+router.get("/follow-ups/all", leadController.getFollowUps);
+
+// UPDATE follow-up status
+router.put(
+  "/follow-ups/:id",
+  leadController.updateFollowUpStatus
+);
+
+// DELETE an individual follow-up
 router.delete("/follow-ups/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -44,74 +38,60 @@ router.delete("/follow-ups/:id", async (req, res) => {
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid lead ID.",
+        message: "Invalid follow-up ID.",
       });
     }
 
-    const lead = await Lead.findById(id);
+    const followUp = await FollowUp.findByIdAndDelete(id);
 
-    if (!lead) {
+    if (!followUp) {
       return res.status(404).json({
         success: false,
-        message: "Lead not found.",
+        message: "Follow-up not found.",
       });
     }
-
-    // Clear only follow-up fields. Keep the Lead document.
-    lead.followUpDate = null;
-    lead.followUpTime = "";
-    lead.followUpNote = "";
-    lead.followUpStatus = "Pending";
-    lead.priority = "Medium";
-
-    await lead.save();
 
     return res.status(200).json({
       success: true,
-      message: "Follow-up removed successfully.",
-      lead,
+      message: "Follow-up deleted successfully.",
     });
   } catch (error) {
     console.error("Delete follow-up error:", error);
+
     return res.status(500).json({
       success: false,
-      message: "Failed to remove follow-up.",
+      message: error.message || "Failed to delete follow-up.",
     });
   }
 });
 
-// 
-// 2. ASSIGN & STATUS PATCH ROUTES
-// 
+// ASSIGN LEAD TO EMPLOYEE
 router.patch(
   "/:id/assign",
   allowRoles("administrator", "manager"),
   async (req, res) => {
     try {
-      const { employeeId } = req.body;
       const { id } = req.params;
+      const { employeeId } = req.body;
 
       if (
         !mongoose.isValidObjectId(id) ||
         !mongoose.isValidObjectId(employeeId)
       ) {
         return res.status(400).json({
+          success: false,
           message: "Invalid lead ID or employee ID.",
         });
       }
 
-      const employee = await User.findOne({
-        _id: employeeId,
-        $or: [
-          { isActive: true },
-          { iactive: true },
-          { isActive: { $exists: false } }
-        ]
-      });
+      const TeamUser = require("../models/TeamUser");
+
+      const employee = await TeamUser.findById(employeeId);
 
       if (!employee) {
-        return res.status(400).json({
-          message: "Select an active employee.",
+        return res.status(404).json({
+          success: false,
+          message: "Employee not found.",
         });
       }
 
@@ -119,17 +99,20 @@ router.patch(
 
       if (!lead) {
         return res.status(404).json({
+          success: false,
           message: "Lead not found.",
         });
       }
 
-      const previousEmployee = lead.assignedEmployee?.toString() || null;
+      const previousEmployee =
+        lead.assignedEmployee?.toString() || null;
+
       lead.assignedEmployee = employee._id;
 
       await lead.save();
-      
+
       try {
-        if (logActive) {
+        if (typeof logActive === "function") {
           await logActive(
             req.user.id || req.user._id,
             "LEAD_ASSIGNED",
@@ -146,24 +129,28 @@ router.patch(
       }
 
       return res.status(200).json({
+        success: true,
         message: "Lead assigned successfully.",
         lead,
       });
     } catch (error) {
       console.error("Assign lead error:", error);
+
       return res.status(500).json({
-        message: "Failed to assign lead.",
-        error: error.message,
+        success: false,
+        message: error.message || "Failed to assign lead.",
       });
     }
   }
 );
 
-router.patch("/:id/status", transitionStatus);
+// UPDATE LEAD STATUS
+router.patch("/:id/status", leadController.transitionStatus);
 
-// 
-// 3. DYNAMIC /:id ROUTES LAST
-// 
-router.route("/:id").put(updatedLead).delete(deleteLead);
+// UPDATE LEAD
+router.put("/:id", leadController.updateLead);
+
+// DELETE LEAD
+router.delete("/:id", leadController.deleteLead);
 
 module.exports = router;

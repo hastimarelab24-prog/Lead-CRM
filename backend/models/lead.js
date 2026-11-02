@@ -24,33 +24,50 @@ const LeadSchema = new mongoose.Schema(
         "social media",
       ],
     },
-   status: {
-  type: String,
-  required: true,
-  enum: [
-    "New", "new",
-    "Contacted", "contacted",
-    "Qualified", "qualified",
-    "Proposal Sent", "proposal sent", "Proposal sent",
-    "Nurturing", "nurturing",
-    "Lost", "lost",
-    "Won", "won"
-  ],
-  default: "New"
-},
-   assignedEmployee: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "TeamUser" // 👈 આ નામ "TeamUser" હોવું ફરજિયાત છે
-},
-   
-    followUpDate:{type:Date,default:null},
-    followUpTime:{type:String,default:""},
-    priority:{type:String,enum:["Low","Medium","High"],default:"Medium"},
-    followUpNote:{type:String,default:""},
-    followUpStatus:{type:String,enum:["Pending","Completed"],default:"Pending"}
+    status: {
+      type: String,
+      required: true,
+      enum: [
+        "New",
+        "new",
+        "Contacted",
+        "contacted",
+        "Qualified",
+        "qualified",
+        "Proposal Sent",
+        "proposal sent",
+        "Proposal sent",
+        "Nurturing",
+        "nurturing",
+        "Lost",
+        "lost",
+        "Won",
+        "won",
+      ],
+      default: "New",
+    },
+    assignedEmployee: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TeamUser",
+    },
+
+    followUpDate: { type: Date, default: null },
+    followUpTime: { type: String, default: "" },
+  priority: {
+      type: String,
+      enum: ["low", "medium", "high", "urgent"],
+      lowercase: true,
+      default: "medium",
+    },
+    followUpNote: { type: String, default: "" },
+    followUpStatus: {
+      type: String,
+      enum: ["Pending", "Completed"],
+      default: "Pending",
+    },
   },
   { timestamps: true },
 );
 
 const Lead = mongoose.models.Lead || mongoose.model("Lead", LeadSchema);
-module.exports = Lead
+module.exports = Lead;

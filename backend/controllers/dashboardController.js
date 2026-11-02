@@ -1,188 +1,382 @@
-const Lead = require('../models/Lead');
-const Activity = require('../models/Activity');
-const User = require('../models/AuthUser');
+const Lead = require("../models/lead");
+const FollowUp = require("../models/FollowUp");
+const Activity = require("../models/Activity");
+// const User = require("../models/AuthUser");
+const User = require("../models/TeamUser");
 
-const getDateFilter = (startDate, endDate) => {
+// Date filter for leads and follow-ups
+const getDateFilter = (startDate, endDate, field = "createdAt") => {
   const filter = {};
-  if (startDate || endDate) {
-    filter.createdAt = {};
-    if (startDate) {
-      filter.createdAt.$gte = new Date(startDate);
-    }
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      filter.createdAt.$lte = end;
+  const dateCondition = {};
+
+  if (startDate) {
+    const start = new Date(`${startDate}T00:00:00.000`);
+
+    if (!Number.isNaN(start.getTime())) {
+      dateCondition.$gte = start;
     }
   }
+
+  if (endDate) {
+    const end = new Date(`${endDate}T23:59:59.999`);
+
+    if (!Number.isNaN(end.getTime())) {
+      dateCondition.$lte = end;
+    }
+  }
+
+  if (Object.keys(dateCondition).length > 0) {
+    filter[field] = dateCondition;
+  }
+
   return filter;
 };
 
+// export leads csv
+exports.exportLeadsCSV = async (req, res) => {
+  try {
+    const leads = await Lead.find()
+      .populate("assignedEmployee", "name email")
+      .sort({ createdAt: -1 })
+      .lean();
+    const headers = [
+      "Name",
+      "Email",
+      "Company",
+      "Phone",
+      "Status",
+      "Source",
+      "Assigned Employee",
+      "Created At",
+    ];
+    const escapeCSV = (value) => {
+      const text = String(value ?? "");
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    const rows = leads.map((lead) => [
+      lead.name,
+      lead.email,
+      lead.company,
+      lead.phone,
+      lead.status,
+      lead.source,
+      lead.assignedEmployee?.name || "",
+      lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : "",
+    ]);
+
+    const csv = [
+      headers.map(escapeCSV).join(","),
+      ...rows.map((row) => row.map(escapeCSV).join(",")),
+    ].join("\n");
+    res.setHeader("Content-Type", "text/csv;charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="leads.csv');
+    return res.status(200).send("\uFEFF" + csv);
+  } catch (err) {
+    console.error("export csv error", error);
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "failed to export leads",
+        error: error.messange,
+      });
+  }
+};
+// Dashboard API
 exports.getDashboardData = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    const dateFilter = getDateFilter(startDate, endDate);
 
+    const dateFilter = getDateFilter(startDate, endDate, "createdAt");
+    const followUpDateFilter = getDateFilter(startDate, endDate, "dueDate");
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Total leads
     const totalLeads = await Lead.countDocuments(dateFilter);
 
+    // Leads by status
     const leadsByStatusRaw = await Lead.aggregate([
-      { $match: dateFilter },
-      { $group: { _id: '$status', count: { $sum: 1 } } }
-    ]);
-
-    const statusMap = {
-      New: 0,
-      Contacted: 0,
-      Qualified: 0,
-      Proposal: 0,
-      Won: 0,
-      Lost: 0
-    };
-    leadsByStatusRaw.forEach((item) => {
-      if (item._id) statusMap[item._id] = item.count;
-    });
-
-    const leadsByStatus = Object.keys(statusMap).map((status) => ({
-      status,
-      count: statusMap[status]
-    }));
-
-    const leadSources = await Lead.aggregate([
-      { $match: dateFilter },
-      { $group: { _id: '$source', count: { $sum: 1 } } },
-      { $project: { _id: 0, source: '$_id', count: 1 } },
-      { $sort: { count: -1 } }
-    ]);
-
-    const wonCount = statusMap['Won'] || 0;
-    const lostCount = statusMap['Lost'] || 0;
-    const conversionRate = totalLeads > 0 ? ((wonCount / totalLeads) * 100).toFixed(2) : 0;
-    
-    const totalValueResult = await Lead.aggregate([
-      { $match: { ...dateFilter, status: 'Won' } },
-      { $group: { _id: null, totalValue: { $sum: '$dealValue' } } }
-    ]);
-    const totalRevenue = totalValueResult.length > 0 ? totalValueResult[0].totalValue : 0;
-
-    const employeeActivities = await Activity.aggregate([
       { $match: dateFilter },
       {
         $group: {
-          _id: '$performedBy',
-          totalActivities: { $sum: 1 },
-          calls: { $sum: { $cond: [{ $eq: ['$type', 'Call'] }, 1, 0] } },
-          emails: { $sum: { $cond: [{ $eq: ['$type', 'Email'] }, 1, 0] } },
-          meetings: { $sum: { $cond: [{ $eq: ['$type', 'Meeting'] }, 1, 0] } }
-        }
+          _id: { $toLower: "$status" },
+          count: { $sum: 1 },
+        },
       },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'employee'
-        }
-      },
-      { $unwind: '$employee' },
-      {
-        $project: {
-          _id: 1,
-          name: '$employee.name',
-          email: '$employee.email',
-          totalActivities: 1,
-          calls: 1,
-          emails: 1,
-          meetings: 1
-        }
-      },
-      { $sort: { totalActivities: -1 } }
     ]);
 
-    res.status(200).json({
-      success: true,
-      data: {
-        summary: {
-          totalLeads,
-          wonLeads: wonCount,
-          lostLeads: lostCount,
-          conversionRate: Number(conversionRate),
-          totalRevenue
-        },
-        leadsByStatus,
-        leadSources,
-        employeeActivities
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve dashboard analytics.',
-      error: error.message
-    });
-  }
-};
-
-exports.exportLeadsCSV = async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    const dateFilter = getDateFilter(startDate, endDate);
-
-    const leads = await Lead.find(dateFilter).populate('assignedTo', 'name email').lean();
-    if (!leads || leads.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'No leads found for the selected date range.'
-      });
-    }
-
-    const headers = [
-      'ID',
-      'Name',
-      'Email',
-      'Phone',
-      'Company',
-      'Status',
-      'Source',
-      'Deal Value($)',
-      'Assigned To',
-      'Created At'
-    ];
-
-    const formatField = (val) => {
-      if (val === null || val === undefined) return '""';
-      const str = String(val).replace(/"/g, '""');
-      return `"${str}"`;
+    const statusMap = {
+      new: 0,
+      contacted: 0,
+      qualified: 0,
+      "proposal sent": 0,
+      nurturing: 0,
+      won: 0,
+      lost: 0,
     };
 
-    const csvRows = [
-      headers.join(','),
-      ...leads.map((lead) =>
-        [
-          formatField(lead._id),
-          formatField(lead.name),
-          formatField(lead.email),
-          formatField(lead.phone),
-          formatField(lead.company),
-          formatField(lead.status),
-          formatField(lead.source),
-          formatField(lead.dealValue || 0),
-          formatField(lead.assignedTo?.name || 'Unassigned'),
-          formatField(new Date(lead.createdAt).toISOString().split('T')[0])
-        ].join(',')
-      )
-    ];
+    const statusLabels = {
+      new: "New",
+      contacted: "Contacted",
+      qualified: "Qualified",
+      "proposal sent": "Proposal Sent",
+      nurturing: "Nurturing",
+      won: "Won",
+      lost: "Lost",
+    };
 
-    const csvContent = csvRows.join('\n');
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=leads_export_${new Date().toISOString().split('T')[0]}.csv`);
-    return res.status(200).send(csvContent);
+    leadsByStatusRaw.forEach((item) => {
+      if (item._id && statusMap[item._id] !== undefined) {
+        statusMap[item._id] = item.count;
+      }
+    });
+
+    const leadsByStatus = Object.entries(statusMap).map(([status, count]) => ({
+      status: statusLabels[status],
+      count,
+    }));
+
+    // Active leads
+    const wonCount = statusMap.won;
+    const lostCount = statusMap.lost;
+
+    const activeLeads = Math.max(totalLeads - wonCount - lostCount, 0);
+
+    // Conversion rate
+    const conversionRate =
+      totalLeads > 0 ? Number(((wonCount / totalLeads) * 100).toFixed(2)) : 0;
+
+    // Lead sources
+    const leadSources = await Lead.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: "$source",
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          source: "$_id",
+          count: 1,
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    // Total revenue
+    const totalValueResult = await Lead.aggregate([
+      {
+        $match: {
+          ...dateFilter,
+          status: { $in: ["Won", "won"] },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalValue: {
+            $sum: { $ifNull: ["$dealValue", 0] },
+          },
+        },
+      },
+    ]);
+
+    const totalRevenue =
+      totalValueResult.length > 0 ? totalValueResult[0].totalValue : 0;
+
+    // Get employees from AuthUser
+    const employees = await User.find({
+      role: { $in: ["manager", "employee"] },
+      isActive: { $ne: false },
+    })
+      .select("_id name email role")
+      .lean();
+
+    const employeeIds = employees.map((employee) => employee._id);
+    console.log("active empolyee");
+
+    // Employee lead counts
+    const employeeLeadCounts = employeeIds.length
+      ? await Lead.aggregate([
+          {
+            $match: {
+              ...dateFilter,
+              assignedEmployee: { $in: employeeIds },
+            },
+          },
+          {
+            $group: {
+              _id: "$assignedEmployee",
+              totalLeads: { $sum: 1 },
+              wonLeads: {
+                $sum: {
+                  $cond: [
+                    {
+                      $eq: [{ $toLower: { $ifNull: ["$status", ""] } }, "won"],
+                    },
+                    1,
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+        ])
+      : [];
+
+    // Employee follow-up counts
+    const employeeFollowUpCounts = employeeIds.length
+      ? await FollowUp.aggregate([
+          {
+            $match: {
+              ...followUpDateFilter,
+              assignedTo: { $in: employeeIds },
+            },
+          },
+          {
+            $group: {
+              _id: "$assignedTo",
+
+              totalFollowUps: { $sum: 1 },
+
+              completedFollowUps: {
+                $sum: {
+                  $cond: [{ $eq: ["$status", "completed"] }, 1, 0],
+                },
+              },
+
+              pendingFollowUps: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ["$status", "pending"] },
+                        { $gte: ["$dueDate", today] },
+                      ],
+                    },
+                    1,
+                    0,
+                  ],
+                },
+              },
+
+              overdueFollowUps: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ["$status", "pending"] },
+                        { $lt: ["$dueDate", today] },
+                      ],
+                    },
+                    1,
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+        ])
+      : [];
+    // Employee activity summary
+    const leadCountMap = {};
+
+    employeeLeadCounts.forEach((item) => {
+      if (item._id) {
+        leadCountMap[item._id.toString()] = item;
+      }
+    });
+
+    const followUpCountMap = {};
+
+    employeeFollowUpCounts.forEach((item) => {
+      if (item._id) {
+        followUpCountMap[item._id.toString()] = item;
+      }
+    });
+
+    const employeeActivitySummary = employees.map((employee) => {
+      const id = employee._id.toString();
+
+      const leadData = leadCountMap[id] || {};
+      const followUpData = followUpCountMap[id] || {};
+
+      return {
+        employeeId: employee._id,
+        name: employee.name || "Unknow",
+        email: employee.email || "-",
+        role: employee.role || "empolyee",
+        totalLeads: leadData.totalLeads || 0,
+        wonLeads: leadData.wonLeads || 0,
+        totalFollowUps: followUpData.totalFollowUps || 0,
+        completedFollowUps: followUpData.completedFollowUps || 0,
+        pendingFollowUps: followUpData.pendingFollowUps || 0,
+        overdueFollowUps: followUpData.overdueFollowUps || 0,
+      };
+    });
+
+    // Follow-up summary
+    const followUpSummary = await FollowUp.aggregate([
+      { $match: followUpDateFilter },
+      {
+        $group: {
+          _id: {
+            $toLower: { $ifNull: ["$status", "pending"] },
+          },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const followUpStatusMap = {
+      pending: 0,
+      completed: 0,
+      cancelled: 0,
+    };
+
+    followUpSummary.forEach((item) => {
+      if (followUpStatusMap[item._id] !== undefined) {
+        followUpStatusMap[item._id] = item.count;
+      }
+    });
+
+    // Dashboard response
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalLeads,
+        activeLeads,
+        wonLeads: wonCount,
+        lostLeads: lostCount,
+        conversionRate,
+        totalRevenue,
+        leadsByStatus,
+        leadSources,
+
+        followUps: {
+          total: Object.values(followUpStatusMap).reduce(
+            (total, count) => total + count,
+            0,
+          ),
+          pending: followUpStatusMap.pending,
+          completed: followUpStatusMap.completed,
+          cancelled: followUpStatusMap.cancelled,
+        },
+
+        employeeActivitySummary,
+      },
+    });
   } catch (error) {
-    console.error('Error exporting CSV:', error);
-    res.status(500).json({
+    console.error("Dashboard Controller Error:", error);
+
+    return res.status(500).json({
       success: false,
-      message: 'Failed to export leads data.',
-      error: error.message
+      message: "Failed to fetch dashboard data",
+      error: error.message,
     });
   }
 };

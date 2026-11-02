@@ -6,6 +6,7 @@ const FollowUp = require("../models/FollowUp");
 const validId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 // 1. GET ALL LEADS
+// GET ALL LEADS WITH MULTIPLE FOLLOW-UPS
 exports.getLeads = async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
@@ -16,6 +17,7 @@ exports.getLeads = async (req, res) => {
 
     const filter = {};
 
+    // Search by name, email, and company
     if (search && search.trim()) {
       const searchValue = search.trim();
 
@@ -26,10 +28,15 @@ exports.getLeads = async (req, res) => {
       ];
     }
 
+    // Filter by status
     if (status && status.trim()) {
-      filter.status = status.trim();
+      filter.status = {
+        $regex: `^${status.trim()}$`,
+        $options: "i",
+      };
     }
 
+    // Sorting
     const allowedSortFields = ["createdAt", "name"];
 
     const selectedSortField = allowedSortFields.includes(sortBy)
@@ -38,11 +45,16 @@ exports.getLeads = async (req, res) => {
 
     const selectedSortOrder = sortOrder === "asc" ? 1 : -1;
 
+    // Count leads
     const totalLeads = await Lead.countDocuments(filter);
     const totalPages = Math.ceil(totalLeads / limit);
 
+    // Fetch leads
     const leads = await Lead.find(filter)
-      .populate("assignedEmployee", "name email role")
+      .populate({
+        path: "assignedEmployee",
+        select: "name username email role",
+      })
       .sort({
         [selectedSortField]: selectedSortOrder,
         _id: -1,
@@ -51,29 +63,53 @@ exports.getLeads = async (req, res) => {
       .limit(limit)
       .lean();
 
-      // fetch all follow-up 
-   // Fetch all follow-ups for each lead
-const leadsWithFollowUps = await Promise.all(
-  leads.map(async (lead) => {
-    const followUps = await FollowUp.find({
-      lead: lead._id,
-    })
-      .populate("assignedTo", "name email role")
-      .populate("createdBy", "name email")
-      .sort({ dueDate: 1, createdAt: 1 })
-      .lean();
+    // Fetch all follow-ups for these leads in one query
+    const leadIds = leads.map((lead) => lead._id);
 
-    return {
+    const followUps = leadIds.length
+      ? await FollowUp.find({
+          lead: { $in: leadIds },
+        })
+          .populate({
+            path: "assignedTo",
+            select: "name username email role",
+          })
+          .populate({
+            path: "createdBy",
+            select: "name username email",
+          })
+          .sort({
+            dueDate: 1,
+            createdAt: 1,
+          })
+          .lean()
+      : [];
+
+    // Group follow-ups by lead ID
+    const followUpMap = {};
+
+    followUps.forEach((followUp) => {
+      const leadId = followUp.lead?.toString();
+
+      if (!leadId) return;
+
+      if (!followUpMap[leadId]) {
+        followUpMap[leadId] = [];
+      }
+
+      followUpMap[leadId].push(followUp);
+    });
+
+    // Attach follow-ups to leads
+    const leadsWithFollowUps = leads.map((lead) => ({
       ...lead,
-      followUps,
-    };
-  })
-);
+      followUps: followUpMap[lead._id.toString()] || [],
+    }));
 
     return res.status(200).json({
       success: true,
       count: leadsWithFollowUps.length,
-      leads:leadsWithFollowUps,
+      leads: leadsWithFollowUps,
       pagination: {
         currentPage: page,
         totalPage: totalPages,
@@ -84,11 +120,12 @@ const leadsWithFollowUps = await Promise.all(
       },
     });
   } catch (error) {
-    console.error("Get leads error:", error);
+    console.error("GET LEADS ERROR:", error);
 
     return res.status(500).json({
       success: false,
-      message: error.message || "Failed to load leads.",
+      message: "Failed to load leads.",
+      error: error.message,
     });
   }
 };

@@ -26,6 +26,7 @@ const followUpSchema = new mongoose.Schema(
     priority: {
       type: String,
       enum: ["low", "medium", "high", "urgent"],
+      lowercase: true,
       default: "medium",
     },
     notes: {
