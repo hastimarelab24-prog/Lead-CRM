@@ -45,18 +45,7 @@ const { totalLeads,totalTeam } = useContext(WorkspaceContext);
         },
       ],
     },
-    {
-      title: "INSIGHTS",
-      items: [
-        {
-          name: "Reports",
-          path: "/reports",
-          icon: "▥",
-          roles: ["administrator", "admin", "manager", "employee"],
-        },
-      
-      ],
-    },
+   
   ];
 
   const role = String(user?.role || "employee").toLowerCase();

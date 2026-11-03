@@ -112,6 +112,7 @@ export default function LeadForm({
   const [loadingEmployees, setLoadingEmployees] = useState(true);
 
   // Load employees.
+// Load employees/team members.
   useEffect(() => {
     let cancelled = false;
 
@@ -125,9 +126,7 @@ export default function LeadForm({
           : response?.users || response?.data?.users || response?.data || [];
 
         const employeeList = users.filter(
-          (user) =>
-            user.role?.toLowerCase() === "employee" &&
-            user.isActive !== false
+          (user) => user.isActive !== false
         );
 
         if (!cancelled) {
