@@ -1,4 +1,4 @@
-// 📝 Fixed: Explicit (req, res, next) parameter signature sequence alignment
+//  Fixed: Explicit (req, res, next) parameter signature sequence alignment
 const validateRegistration = (req, res, next) => {
   const { name, email, password } = req.body;
   
@@ -12,10 +12,10 @@ const validateRegistration = (req, res, next) => {
     return res.status(400).json({ message: 'Password must match or exceed 6 alphanumeric characters.' });
   }
   
-  next(); // ✅ This will now run successfully as a function!
+  next(); // This will now run successfully as a function!
 };
 
-// 🔑 Fixed: Explicit (req, res, next) parameter signature sequence alignment
+//  Fixed: Explicit (req, res, next) parameter signature sequence alignment
 const validateLogin = (req, res, next) => {
   const { email, password } = req.body;
   
@@ -26,7 +26,7 @@ const validateLogin = (req, res, next) => {
     return res.status(400).json({ message: 'Account authentication verification password required.' });
   }
   
-  next(); // ✅ This will now run successfully as a function!
+  next(); // This will now run successfully as a function!
 };
 
 module.exports = { validateRegistration, validateLogin };

@@ -16,7 +16,6 @@ async function createNotificationOnce(data) {
       { upsert: true }
     );
   } catch (error) {
-    // Unique index concurrency માં duplicate insert અટકાવે.
     if (error.code !== 11000) throw error;
   }
 }
@@ -24,7 +23,6 @@ async function createNotificationOnce(data) {
 async function processNotifications() {
   const now = new Date();
 
-  // Scheduled reminder time આવી ગયેલા pending tasks
   const reminders = await FollowUp.find({
     status: "pending",
     reminderAt: { $lte: now },
@@ -43,7 +41,6 @@ async function processNotifications() {
     await task.save();
   }
 
-  // Due date પસાર થઈ ગયેલા pending tasks
   const overdueTasks = await FollowUp.find({
     status: "pending",
     dueDate: { $lt: now },
@@ -60,7 +57,6 @@ async function processNotifications() {
 }
 
 function startNotificationScheduler() {
-  // દર મિનિટે reminders ચેક કરે.
   cron.schedule("* * * * *", async () => {
     try {
       await processNotifications();
